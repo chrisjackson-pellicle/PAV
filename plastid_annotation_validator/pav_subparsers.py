@@ -4,13 +4,6 @@
 Contains subparsers used in pav.py
 """
 
-import logging
-from plastid_annotation_validator import utils
-
-
-# Create logger:
-logger = logging.getLogger(f'plastid_annotation_validator.pav_subparsers.{__name__}')
-
 
 def annotate_and_check_parser(subparsers):
     """
@@ -60,6 +53,11 @@ def annotate_and_check_parser(subparsers):
                                 default=[],
                                 dest='refs_order',
                                 help='Order(s) to use for reference genes. Can be specified multiple times. Default is: %(default)s')
+    optional_group_alignment.add_argument('--custom_refs_folder', '-custom_refs',
+                                type=str,
+                                default=None,
+                                dest='custom_refs_folder',
+                                help='Custom folder containing reference GenBank files. Can be used in addition to --refs_order or default references.')
 
     ####################################################################################################################
     optional_group_general = parser_annotate_and_check.add_argument_group('General pipeline options')
@@ -88,6 +86,11 @@ def annotate_and_check_parser(subparsers):
                                  default=None,
                                  metavar='PATH',
                                  help='Path to the chloe.jl script. Must be provided together with --chloe_project_dir.')
+    optional_group_general.add_argument('--linearize_gene', '-linearize_gene',
+                                 type=str,
+                                 default='psbA',
+                                 metavar='GENE_NAME',
+                                 help='Gene to use for genome linearization. Default is: %(default)s')
     optional_group_general.add_argument('--run_profiler',
                               action='store_true',
                               dest='run_profiler',

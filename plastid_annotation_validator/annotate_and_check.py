@@ -783,13 +783,18 @@ def check_no_alignment_and_refs_order(args, gene_median_lengths, gene_synonyms=N
     Check alignment settings and get reference sequences from appropriate sources.
     
     Args:
-        args: Command line arguments containing refs_order and no_alignment
+        args: Command line arguments containing refs_order, refs_folder, and no_alignment
         gene_median_lengths (dict): Dictionary of median gene lengths
         gene_synonyms (dict): Dictionary mapping gene names to standardized synonyms
         
     Returns:
         dict: Dictionary with gene names as keys and lists of SeqRecord objects as values
     """
+    
+    # Initialize reference sources
+    order_refs = None
+    default_refs = None
+    custom_refs = None
     
     # Check if refs_order contains entries
     if args.refs_order:
@@ -807,13 +812,13 @@ def check_no_alignment_and_refs_order(args, gene_median_lengths, gene_synonyms=N
             utils.exit_program()
         
         # Get list of available order directories
-        available_orders = [d for d in os.listdir(order_genomes_dir) 
+        available_orders = [d.lower() for d in os.listdir(order_genomes_dir) 
                           if os.path.isdir(os.path.join(order_genomes_dir, d))]
         
         # Check if all requested orders are available
         missing_orders = []
         for order in args.refs_order:
-            if order not in available_orders:
+            if order.lower() not in available_orders:
                 missing_orders.append(order)
         
         if missing_orders:
@@ -823,12 +828,43 @@ def check_no_alignment_and_refs_order(args, gene_median_lengths, gene_synonyms=N
         
         # Get reference sequences from order-specific directories
         logger.info(f"{"[INFO]:":10} Using reference genomes from orders: {args.refs_order}")
-        return get_ref_gene_seqrecords_from_orders(args.refs_order, gene_median_lengths, gene_synonyms)
+        order_refs = get_ref_gene_seqrecords_from_orders(args.refs_order, gene_median_lengths, gene_synonyms)
     
-    else:
-        # If refs_order is empty, use default reference genomes
+    # Check if custom reference folder is specified
+    if args.custom_refs_folder:
+        # If custom folder is specified, no_alignment must be False
+        if args.no_alignment:
+            logger.error(f"{"[ERROR]:":10} Cannot specify --custom_refs_folder when --no_alignment is True. Please remove --no_alignment or remove --custom_refs_folder.")
+            utils.exit_program()
+        
+        try:
+            logger.info(f"{"[INFO]:":10} Using custom reference genomes from: {args.custom_refs_folder}")
+            custom_refs = get_ref_gene_seqrecords_from_custom_folder(args.custom_refs_folder, gene_median_lengths, gene_synonyms)
+        except Exception as e:
+            logger.error(f"{"[ERROR]:":10} Error processing custom reference folder: {e}")
+            utils.exit_program()
+    
+    # If no specific references are specified, use default reference genomes
+    if not args.refs_order and not args.refs_folder:
         logger.info(f"{"[INFO]:":10} Using default reference genomes from data/reference_genomes_default")
-        return get_ref_gene_seqrecords_from_default(gene_median_lengths, gene_synonyms)
+        default_refs = get_ref_gene_seqrecords_from_default(gene_median_lengths, gene_synonyms)
+    
+    # Merge all reference sources
+    merged_refs = merge_reference_sequences(order_refs, default_refs, custom_refs)
+    
+    # Log summary of reference sources used
+    sources_used = []
+    if order_refs:
+        sources_used.append("order-specific references")
+    if default_refs:
+        sources_used.append("default references")
+    if custom_refs:
+        sources_used.append("custom references")
+    
+    if sources_used:
+        logger.info(f"{"[INFO]:":10} Combined reference sequences from: {', '.join(sources_used)}")
+    
+    return merged_refs
 
 
 def extract_taxonomic_info(record, order_name=None):
@@ -999,6 +1035,158 @@ def get_ref_gene_seqrecords_from_orders(orders, gene_median_lengths, gene_synony
     total_genes = len(ref_cds_seqrecords)
     total_sequences = sum(len(seqrecords) for seqrecords in ref_cds_seqrecords.values())
     logger.debug(f"{"[DEBUG]:":10} Extracted {total_sequences} gene sequences for {total_genes} unique genes from order-specific GenBank files")
+    
+    return ref_cds_seqrecords
+
+
+def merge_reference_sequences(*reference_dicts):
+    """
+    Merge multiple reference sequence dictionaries into a single dictionary.
+    
+    Args:
+        *reference_dicts: Variable number of reference sequence dictionaries
+        
+    Returns:
+        dict: Merged dictionary with gene names as keys and concatenated lists of SeqRecord objects as values
+    """
+    merged_refs = {}
+    
+    for ref_dict in reference_dicts:
+        if ref_dict is None:
+            continue
+            
+        for gene_name, seqrecords in ref_dict.items():
+            if gene_name not in merged_refs:
+                merged_refs[gene_name] = []
+            merged_refs[gene_name].extend(seqrecords)
+    
+    return merged_refs
+
+
+def get_ref_gene_seqrecords_from_custom_folder(refs_folder, gene_median_lengths, gene_synonyms=None):
+    """
+    Extract CDS, rRNA, and tRNA sequences from GenBank files in a custom reference directory.
+    
+    Args:
+        refs_folder (str): Path to custom reference folder containing GenBank files
+        gene_median_lengths (dict): Dictionary of median gene lengths
+        gene_synonyms (dict): Dictionary mapping gene names to standardized synonyms
+        
+    Returns:
+        dict: Dictionary with gene names as keys and lists of SeqRecord objects as values.
+        Multiple copies of the same gene from a single reference file are labeled with
+        _copy_1, _copy_2, etc. in their sequence IDs.
+    """
+    ref_cds_seqrecords = {}
+    
+    gene_names = set()
+    mapped_genes = set()
+    unmapped_genes = set()
+
+    chloe_gene_names = gene_median_lengths.keys()
+    
+    # Initialize synonyms if not provided
+    if gene_synonyms is None:
+        gene_synonyms = {}
+
+    # Check if the custom folder exists
+    if not os.path.exists(refs_folder):
+        raise ValueError(f"Custom reference folder not found: {refs_folder}")
+    
+    if not os.path.isdir(refs_folder):
+        raise ValueError(f"Custom reference path is not a directory: {refs_folder}")
+    
+    # Get GenBank files from the custom folder
+    gbk_files = glob.glob(os.path.join(refs_folder, '*.gb*'))
+    
+    logger.debug(f"{"[DEBUG]:":10} Found {len(gbk_files)} GenBank files in custom reference folder: {refs_folder}")
+    
+    # Track gene copies per file for ID generation
+    gene_copy_counts = {}  # (mapped_gene_name, gbk_file) -> copy_count
+    
+    for gbk_file in gbk_files:
+        try:
+            # Parse GenBank file (handle both gzipped and uncompressed files)
+            if gbk_file.endswith('.gz'):
+                with gzip.open(gbk_file, 'rt') as f:
+                    records = list(SeqIO.parse(f, "genbank"))
+            else:
+                records = list(SeqIO.parse(gbk_file, "genbank"))
+            
+            for record in records:
+                for feature in record.features:
+                    if feature.type in ["CDS", "rRNA", "tRNA"]:
+                        gene_name = None
+                        
+                        # Extract gene name from qualifiers
+                        if 'gene' in feature.qualifiers:
+                            gene_name = feature.qualifiers['gene'][0]
+                        elif 'product' in feature.qualifiers:
+                            gene_name = '_'.join(feature.qualifiers['product'])
+                        else:
+                            raise ValueError(f"No gene name found for feature: {feature}")
+                        
+                        if gene_name:
+                            gene_names.add(gene_name)
+                            
+                            # Try to map gene name using synonyms
+                            mapped_gene_name = gene_name
+                            if gene_name in gene_synonyms:
+                                mapped_gene_name = gene_synonyms[gene_name]
+                                mapped_genes.add(gene_name)
+                                logger.debug(f"{"[DEBUG]:":10} Mapped gene name: {gene_name} -> {mapped_gene_name}")
+                            else:
+                                unmapped_genes.add(gene_name)
+                            
+                            # Extract the gene sequence
+                            gene_seq = feature.location.extract(record.seq)
+                            
+                            # Extract taxonomic information for ID generation
+                            order_tax, family_tax, genus_tax, species_tax = extract_taxonomic_info(record)
+                            
+                            # Track copy count for this gene in this file
+                            copy_key = (mapped_gene_name, gbk_file)
+                            if copy_key not in gene_copy_counts:
+                                gene_copy_counts[copy_key] = 0
+                            gene_copy_counts[copy_key] += 1
+                            copy_number = gene_copy_counts[copy_key]
+                            
+                            # Create a SeqRecord for this gene with copy number
+                            base_id = f"{order_tax}_{family_tax}_{genus_tax}_{species_tax}_{mapped_gene_name}_{os.path.basename(gbk_file)}"
+                            if copy_number > 1:
+                                gene_id = f"{base_id}_copy_{copy_number}"
+                            else:
+                                gene_id = base_id
+                            
+                            gene_seqrecord = SeqRecord(
+                                seq=gene_seq,
+                                id=gene_id,
+                                description=f"{feature.type} from custom/{os.path.basename(gbk_file)} (original: {gene_name})"
+                            )
+                            
+                            # Add to the dictionary using mapped name
+                            if mapped_gene_name not in ref_cds_seqrecords:
+                                ref_cds_seqrecords[mapped_gene_name] = []
+                            ref_cds_seqrecords[mapped_gene_name].append(gene_seqrecord)
+            
+        except Exception as e:
+            logger.warning(f"{"[WARNING]:":10} Error processing GenBank file {os.path.basename(gbk_file)}: {e}")
+            continue
+    
+    # Check which Genbank gene names are still not found in the Chloe gene names after mapping
+    unfound_gbk_gene_names = []
+    for gk_gene_name in gene_names:
+        mapped_name = gene_synonyms.get(gk_gene_name, gk_gene_name)
+        if mapped_name not in chloe_gene_names:
+            unfound_gbk_gene_names.append(gk_gene_name)
+
+    if unfound_gbk_gene_names:
+        logger.debug(f"{"[DEBUG]:":10} Genes still not found in median lengths after mapping: {unfound_gbk_gene_names}...")
+    
+    # Log summary
+    total_genes = len(ref_cds_seqrecords)
+    total_sequences = sum(len(seqrecords) for seqrecords in ref_cds_seqrecords.values())
+    logger.debug(f"{"[DEBUG]:":10} Extracted {total_sequences} gene sequences for {total_genes} unique genes from custom reference folder")
     
     return ref_cds_seqrecords
 
@@ -1895,15 +2083,16 @@ def align_genes(all_sample_results, ref_gene_seqrecords, output_directory, pool_
     utils.log_separator(logger)
 
 
-def linearize_genome_upstream_psbA(gbk_file, fasta_file, output_dir, sample_name):
+def linearize_genome_upstream_gene(gbk_file, fasta_file, output_dir, sample_name, linearize_gene='psbA'):
     """
-    Linearize genome upstream of psbA gene and write new fasta file.
+    Linearize genome upstream of specified gene and write new fasta file.
     
     Args:
         gbk_file (str): Path to annotated GenBank file
         fasta_file (str): Path to original fasta file
         output_dir (str): Output directory for linearized fasta
         sample_name (str): Sample name for output file
+        linearize_gene (str): Gene name to use for linearization (default: 'psbA')
         
     Returns:
         str: Path to the new linearized fasta file
@@ -1913,31 +2102,31 @@ def linearize_genome_upstream_psbA(gbk_file, fasta_file, output_dir, sample_name
         gbk_io, adjusted_gbk_content = utils.build_adjusted_genbank_io(gbk_file, fasta_file, logger=logger)
         record = next(SeqIO.parse(gbk_io, 'genbank'))
         
-        # Find psbA gene
-        psbA_start = None
+        # Find the specified gene
+        gene_start = None
         for feature in record.features:
             if feature.type == 'CDS' and 'gene' in feature.qualifiers:
-                if feature.qualifiers['gene'][0] == 'psbA':
-                    psbA_start = feature.location.start
+                if feature.qualifiers['gene'][0] == linearize_gene:
+                    gene_start = feature.location.start
                     break
         
-        if psbA_start is None:
-            logger.warning(f"{"[WARNING]:":10} psbA gene not found in {sample_name}, using original sequence")
+        if gene_start is None:
+            logger.warning(f"{"[WARNING]:":10} {linearize_gene} gene not found in {sample_name}, using original sequence")
             return fasta_file
         
         # Read original fasta sequence
         with open(fasta_file, 'r') as handle:
             fasta_record = next(SeqIO.parse(handle, 'fasta'))
         
-        # Linearize upstream of psbA
+        # Linearize upstream of the specified gene
         sequence = fasta_record.seq
-        linearized_sequence = sequence[psbA_start:] + sequence[:psbA_start]
+        linearized_sequence = sequence[gene_start:] + sequence[:gene_start]
         
         # Create new fasta record
         linearized_record = SeqRecord(
             seq=linearized_sequence,
             id=fasta_record.id,
-            description=f"Linearized upstream of psbA (original position: {psbA_start})"
+            description=f"Linearized upstream of {linearize_gene} (original position: {gene_start})"
         )
         
         # Write linearized fasta file
@@ -1945,7 +2134,7 @@ def linearize_genome_upstream_psbA(gbk_file, fasta_file, output_dir, sample_name
         with open(linearized_fasta, 'w') as handle:
             SeqIO.write(linearized_record, handle, 'fasta')
         
-        logger.debug(f"{"[INFO]:":10} Linearized {sample_name} upstream of psbA (position {psbA_start})")
+        logger.debug(f"{"[INFO]:":10} Linearized {sample_name} upstream of {linearize_gene} (position {gene_start})")
         return linearized_fasta
         
     except Exception as e:
@@ -1953,7 +2142,7 @@ def linearize_genome_upstream_psbA(gbk_file, fasta_file, output_dir, sample_name
         return fasta_file
 
 
-def annotate_genomes(genome_fasta_dir, output_directory, chloe_project_dir=None, chloe_script_path=None):
+def annotate_genomes(genome_fasta_dir, output_directory, chloe_project_dir=None, chloe_script_path=None, linearize_gene='psbA'):
     """
     Annotate genome fasta files using chloe annotate command.
     
@@ -2108,14 +2297,15 @@ def annotate_genomes(genome_fasta_dir, output_directory, chloe_project_dir=None,
 
         # Linearize and re-annotate (if we have original annotation but no linearized)
         if has_original_annotation and not has_linearized_annotation_and_fasta:
-            logger.debug(f"{"[INFO]:":10} Linearizing {filename_prefix} upstream of psbA...")
+            logger.debug(f"{"[INFO]:":10} Linearizing {filename_prefix} upstream of {linearize_gene}...")
             
-            # Linearize the genome upstream of psbA
-            output_sample_fasta_linearized = linearize_genome_upstream_psbA(
+            # Linearize the genome upstream of the specified gene
+            output_sample_fasta_linearized = linearize_genome_upstream_gene(
                 output_sample_gbk_original, 
                 fasta_file, 
                 output_sample_dir, 
-                filename_prefix_no_dots
+                filename_prefix_no_dots,
+                linearize_gene
             )
 
             if output_sample_fasta_linearized != fasta_file:
@@ -2141,6 +2331,7 @@ def annotate_genomes(genome_fasta_dir, output_directory, chloe_project_dir=None,
         annotated_genomes[filename_prefix_no_dots]['fasta'] = output_sample_fasta_linearized
 
     utils.log_separator(logger)
+    time.sleep(0.1)
 
     return annotated_genomes
 
@@ -2477,11 +2668,29 @@ def query_intergenic_regions(annotated_genomes_dict, output_directory, min_inter
         logger.error(f"{"[ERROR]:":10} Please ensure the BLAST database has been created")
         return
 
-    # Prepare data for multiprocessing
+    # Prepare data for multiprocessing and check for existing reports
     sample_data_list = []
+    skipped_samples = []
+    existing_results = []
+    
     for sample_name, genome_info in annotated_genomes_dict.items():
         if 'error' in genome_info:
             logger.warning(f"{"[WARNING]:":10} Skipping {sample_name} - has error: {genome_info['error']}")
+            continue
+        
+        # Check if report already exists
+        genome_report_file = os.path.join(intergenic_output_dir, f"{sample_name}_intergenic_blast_results.tsv")
+        if os.path.exists(genome_report_file) and os.path.getsize(genome_report_file) > 0:
+            logger.debug(f"{"[INFO]:":10} Skipping {sample_name} - intergenic report already exists: {genome_report_file}")
+            skipped_samples.append(sample_name)
+            
+            # Load existing results for combined report
+            try:
+                existing_blast_results = load_existing_blast_results(genome_report_file, sample_name)
+                existing_results.extend(existing_blast_results)
+                logger.debug(f"{"[DEBUG]:":10} Loaded {len(existing_blast_results)} existing BLAST results for {sample_name}")
+            except Exception as e:
+                logger.warning(f"{"[WARNING]:":10} Failed to load existing results for {sample_name}: {str(e)}")
             continue
             
         sample_data = {
@@ -2498,11 +2707,24 @@ def query_intergenic_regions(annotated_genomes_dict, output_directory, min_inter
         sample_data_list.append(sample_data)
     
     if not sample_data_list:
-        logger.warning(f"{"[WARNING]:":10} No valid samples found for intergenic analysis")
-        return
+        if skipped_samples:
+            logger.info(f"{"[INFO]:":10} All {len(skipped_samples)} samples already have intergenic reports, skipping processing")
+            # Write combined report with existing results only
+            if existing_results:
+                combined_report_file = os.path.join(intergenic_output_dir, "combined_intergenic_blast_results.tsv")
+                write_blast_report(existing_results, combined_report_file, "ALL_GENOMES")
+                logger.info(f"{"[INFO]:":10} Combined report written to: {combined_report_file}")
+            return
+        else:
+            logger.warning(f"{"[WARNING]:":10} No valid samples found for intergenic analysis")
+            return
     
-    # Combined results for all genomes
-    all_results = []
+    # Log processing summary
+    if skipped_samples:
+        logger.info(f"{"[INFO]:":10} Skipping {len(skipped_samples)} samples with existing reports: {', '.join(skipped_samples[:5])}{'...' if len(skipped_samples) > 5 else ''}")
+    
+    # Combined results for all genomes (start with existing results)
+    all_results = existing_results.copy()
     
     # Process samples with multiprocessing and progress bar
     logger.info(f"{"[INFO]:":10} Processing {len(sample_data_list)} samples with {pool_size} processes")
@@ -2923,6 +3145,60 @@ def blast_intergenic_regions(intergenic_regions, blast_db_path, evalue_threshold
     return blast_results
 
 
+def load_existing_blast_results(report_file, sample_name):
+    """
+    Load existing BLAST results from a TSV report file.
+    
+    Args:
+        report_file (str): Path to the TSV report file
+        sample_name (str): Name of the sample
+        
+    Returns:
+        list: List of BLAST result dictionaries
+    """
+    blast_results = []
+    
+    try:
+        with open(report_file, 'r') as f:
+            # Skip header line
+            next(f)
+            
+            for line in f:
+                if line.strip():
+                    fields = line.strip().split('\t')
+                    if len(fields) >= 15:  # Ensure we have enough fields
+                        blast_result = {
+                            'sample_name': fields[0],
+                            'intergenic_region_id': fields[1],
+                            'hit_origin': fields[2],
+                            'hit_gene': fields[3],
+                            'percent_identity': float(fields[4]),
+                            'alignment_length': int(fields[5]),
+                            'mismatches': int(fields[6]),
+                            'gap_opens': int(fields[7]),
+                            'query_start': int(fields[8]),
+                            'query_end': int(fields[9]),
+                            'subject_start': int(fields[10]),
+                            'subject_end': int(fields[11]),
+                            'evalue': float(fields[12]),
+                            'bitscore': float(fields[13]),
+                            'hit_title': fields[14] if len(fields) > 14 else '',
+                            'intergenic_start': int(fields[15]) if len(fields) > 15 else 0,
+                            'intergenic_end': int(fields[16]) if len(fields) > 16 else 0,
+                            'intergenic_length': int(fields[17]) if len(fields) > 17 else 0,
+                            'upstream_gene': fields[18] if len(fields) > 18 else '',
+                            'downstream_gene': fields[19] if len(fields) > 19 else ''
+                        }
+                        blast_results.append(blast_result)
+    except Exception as e:
+        # Use global logger if available, otherwise just raise the exception
+        if 'logger' in globals():
+            logger.error(f"{"[ERROR]:":10} Failed to load existing BLAST results from {report_file}: {str(e)}")
+        raise
+    
+    return blast_results
+
+
 def write_blast_report(blast_results, output_file, sample_name, logger=None):
     """
     Write BLAST results to TSV file.
@@ -3161,7 +3437,8 @@ def main(args):
             args.genome_fasta_dir,
             args.output_directory,
             getattr(args, 'chloe_project_dir', None),
-            getattr(args, 'chloe_script', None)
+            getattr(args, 'chloe_script', None),
+            getattr(args, 'linearize_gene', 'psbA')
         )
 
         # Check genes and write reports
@@ -3198,6 +3475,7 @@ def main(args):
 
     finally:
         # Log total completion time before cleaning up the logger
+        utils.log_separator(logger)
         utils.log_completion_time(start_time, logger if ('logger' in globals() and logger) else None, label="PAV subcommand `annotate_and_check` completed")
 
         utils.log_manager.cleanup()

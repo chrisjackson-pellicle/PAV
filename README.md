@@ -4,17 +4,18 @@ A tool for annotating and validating angiosperm plastid genome annotations, with
 
 ## Overview
 
-PAV is designed to process plastid genome assemblies, perform automated annotation using [Chloë](https://github.com/ian-small/Chloe.jl), validate gene annotations against reference sequences, and generate comprehensive reports. The tool includes features for reference-based alignment, and detailed quality assessment.
+PAV is designed to process plastid genome assemblies, perform automated annotation using [Chloë](https://github.com/ian-small/Chloe.jl), validate gene annotations against reference sequences, and generate comprehensive reports. The tool includes features for genome linearization, reference-based alignment, detailed quality assessment, and EMBL/ENA template generation.
 
 ## Features
 
 - **Automated Annotation**: Uses Chloë for plastid genome annotation
-- **Genome Linearization**: Automatically linearizes genomes upstream of `psbA` gene
-- **Reference-Based Validation**: Compares annotations against reference genomes from specified orders or default genome set
-- **Quality Assessment**: Validates gene lengths, identifies any nternal stop codons, and checks for canonical start and stop codons
-- **Alignment Generation**: Creates nucleotide (rRNA, tRNA) and protein alignments with reference sequences for CDS, rRNA, and tRNA genes
+- **Genome Linearization**: Automatically linearizes genomes upstream of a specified gene (defaults to `psbA`)
+- **Reference-Based Validation**: Compares annotations against reference genomes from multiple sources (order-specific, default, or custom)
+- **Quality Assessment**: Validates gene lengths, identifies internal stop codons, and checks for canonical start and stop codons
+- **Alignment Generation**: Creates nucleotide alignments with reference sequences for CDS, rRNA, and tRNA genes
 - **Comprehensive Reporting**: Generates detailed reports and statistics
 - **EMBL and ENA Template Conversion**: Converts annotated GenBank records to EMBL and produces ENA submission-ready templates
+- **Intergenic Region Analysis**: BLAST analysis of intergenic regions for functional characterization
 
 ## Installation
 
@@ -64,7 +65,7 @@ PAV is designed to process plastid genome assemblies, perform automated annotati
 ```bash
 pav annotate_and_check \
   --input_dir /path/to/fasta/files \
-  --output_dir /path/to/output \
+  --output_dir /path/to/output
 ```
 
 ### Command Line Options
@@ -75,17 +76,19 @@ pav annotate_and_check \
 
 #### Optional Arguments
 - `--refs_order`: Reference order(s) to use for validation (can specify multiple)
+- `--custom_refs_folder`: Custom folder containing reference GenBank files (can be used in addition to --refs_order or default references)
 - `--no_alignment`: Skip alignment generation
-- `--min_length_percentage`: Minimum gene length percentage (default: 50)
-- `--max_length_percentage`: Maximum gene length percentage (default: 200)
+- `--min_length_percentage`: Minimum gene length percentage (default: 0.8)
+- `--max_length_percentage`: Maximum gene length percentage (default: 1.2)
 - `--pool`: Number of processes for multiprocessing (default: 1)
 - `--threads`: Number of threads per process (default: 1)
- - `--metadata_tsv`: TSV file providing sample metadata for EMBL/ENA conversion
- - `--skip_intergenic_analysis`: Skip intergenic BLAST analysis
- - `--min_intergenic_length`: Minimum intergenic length to analyze (default: 0)
- - `--blast_evalue`: BLAST E-value threshold (default: 1e-10)
- - `--max_blast_hits`: Max BLAST hits to retain per region (default: 1)
- - `--debug_intergenic`: Write intergenic regions to FASTA for debugging
+- `--linearize_gene`: Gene to use for genome linearization (default: psbA)
+- `--metadata_tsv`: TSV file providing sample metadata for EMBL/ENA conversion
+- `--skip_intergenic_analysis`: Skip intergenic BLAST analysis
+- `--min_intergenic_length`: Minimum intergenic length to analyze (default: 0)
+- `--blast_evalue`: BLAST E-value threshold (default: 1e-10)
+- `--max_blast_hits`: Max BLAST hits to retain per region (default: 1)
+- `--debug_intergenic`: Write intergenic regions to FASTA for debugging
 
 ### Example Commands
 
@@ -93,7 +96,7 @@ pav annotate_and_check \
 ```bash
 pav annotate_and_check \
   --input_dir genomes/ \
-  --output_dir results/ \
+  --output_dir results/
 ```
 
 #### Multiple reference orders:
@@ -104,12 +107,37 @@ pav annotate_and_check \
   --refs_order Alismatales Poales Arecales
 ```
 
+#### Custom reference folder:
+```bash
+pav annotate_and_check \
+  --input_dir genomes/ \
+  --output_dir results/ \
+  --custom_refs_folder /path/to/custom/references/
+```
+
+#### Combined reference sources:
+```bash
+pav annotate_and_check \
+  --input_dir genomes/ \
+  --output_dir results/ \
+  --refs_order Alismatales \
+  --custom_refs_folder /path/to/custom/references/
+```
+
 #### Skip alignments:
 ```bash
 pav annotate_and_check \
   --input_dir genomes/ \
   --output_dir results/ \
   --no_alignment
+```
+
+#### Custom linearization gene:
+```bash
+pav annotate_and_check \
+  --input_dir genomes/ \
+  --output_dir results/ \
+  --linearize_gene rbcL
 ```
 
 #### Custom parameters:
@@ -166,10 +194,17 @@ output_dir/
 ### 1. Genome Annotation
 - Processes input FASTA files using Chloë
 - Performs initial annotation on original sequences
-- Linearizes genomes upstream of psbA gene
+- Linearizes genomes upstream of a specified gene (default: psbA)
 - Re-annotates linearized sequences
 
-### 2. Annotation Validation
+**Linearization Process:**
+- The tool identifies the specified gene in the annotated genome
+- Linearizes the circular genome by cutting upstream of the gene start position
+- Creates a new FASTA file with the linearized sequence
+- Re-annotates the linearized sequence to ensure proper feature coordinates
+
+### 2. Reference Validation
+- Loads reference sequences from multiple sources (CDS, rRNA, and tRNA)
 - Validates gene annotations against reference data
 - Checks for gene length outliers, internal stop codons, and non-canonical start and stop codons
 - Generates detailed reports
@@ -181,6 +216,11 @@ output_dir/
 ### 4. EMBL and ENA Template Generation
 - Adds locus tags and standardizes features for EMBL
 - Builds EMBL template using metadata TSV (see below), ready for submission to ENA
+
+### 6. Intergenic Region Analysis
+- Extracts intergenic regions from annotated genomes
+- Performs BLAST analysis against reference databases
+- Generates comprehensive reports of intergenic region characteristics
 
 ## Metadata TSV Format
 
@@ -208,11 +248,14 @@ Notes:
 
 PAV processes and validates three main types of plastid genes:
 
-- **CDS (Coding Sequences)**: Protein-coding genes with translation validation
-- **rRNA (Ribosomal RNA)**: Ribosomal RNA genes with nucleotide alignment
-- **tRNA (Transfer RNA)**: Transfer RNA genes with nucleotide alignment
+- **CDS (Coding Sequences)**: Protein-coding genes with translation validation and backtranslation alignment
+- **rRNA (Ribosomal RNA)**: Ribosomal RNA genes with direct nucleotide alignment
+- **tRNA (Transfer RNA)**: Transfer RNA genes with direct nucleotide alignment
 
-All gene types are extracted from reference GenBank files and used for validation and alignment generation.
+### Reference Sequence Naming
+Reference sequences are named using the format: `{Order}_{Family}_{Genus}_{Species}_{GeneName}_{Filename}`
+- Multiple copies of the same gene from a single reference file are labeled with `_copy_1`, `_copy_2`, etc.
+- This ensures unique identification of each gene copy in alignment files
 
 ## File Formats
 
@@ -228,12 +271,40 @@ All gene types are extracted from reference GenBank files and used for validatio
 
 ## Reference Data
 
-PAV uses reference genomes from the `data/reference_genomes_default` directory by default, or he  `data/order_genomes/` directory if orders are specified via the `--refs_order` flag. Each order subfolder contains:
-- Reference genomes in GenBank format
-- Taxonomic information for sequence identification
+PAV supports multiple sources of reference genomes:
+
+### Built-in References
+- **Order-specific references**: Located in `data/order_genomes/` directory, organized by taxonomic order
+- **Default references**: Located in `data/reference_genomes_default/` directory
+
+### Custom References
+- **Custom reference folder**: Users can provide their own folder of reference GenBank files using `--custom_refs_folder`
+- Supports both compressed (.gz) and uncompressed GenBank files
+- Can be used alone or in combination with built-in references
+
+### Reference Combination
+PAV can combine reference sequences from multiple sources:
+- Order-specific references (via `--refs_order`)
+- Default references (when no specific references are specified)
+- Custom references (via `--custom_refs_folder`)
+
+All reference sources are merged to provide comprehensive validation and alignment data.
+
+### Available Orders
+The following taxonomic orders are available in the built-in reference database:
+- Acorales, Alismatales, Amborellales, Apiales, Aquifoliales, Arecales, Asparagales, Asterales
+- Austrobaileyales, Berberidopsidales, Boraginales, Brassicales, Buxales, Canellales
+- Caryophyllales, Celastrales, Ceratophyllales, Chloranthales, Commelinales, Cornales
+- Crossosomatales, Cucurbitales, Dilleniales, Dioscoreales, Dipsacales, Ericales
+- Fabales, Fagales, Garryales, Gentianales, Geraniales, Huerteales, Icacinales
+- Lamiales, Laurales, Liliales, Magnoliales, Malpighiales, Malvales, Metteniusales
+- Myrtales, Nymphaeales, Oxalidales, Pandanales, Paracryphiales, Petrosaviales
+- Piperales, Poales, Proteales, Ranunculales, Rosales, Santalales, Sapindales
+- Saxifragales, Solanales, Trochodendrales, Vitales, Zingiberales, Zygophyllales
+
+See `data/order_genomes/` for the complete list and available reference genomes.
 
 ## Configuration
-
 
 ### Median Lengths
 Reference gene lengths are stored in `data/plDNA_genes_median_lengths.csv` for validation.
@@ -247,6 +318,8 @@ Reference gene lengths are stored in `data/plDNA_genes_median_lengths.csv` for v
 3. **BLAST+ not found**: Install BLAST+ (`blastn`, `makeblastdb`) and ensure they are in your $PATH
 4. **Metadata TSV columns**: Ensure the TSV has exactly the required columns listed above
 5. **Memory issues**: Reduce `--pool` and `--threads` parameters
+6. **Custom reference folder not found**: Verify the path to your custom reference folder exists and contains GenBank files
+7. **Linearization gene not found**: If the specified linearization gene is not found in a genome, the original sequence will be used without linearization
 
 ## Support
 
@@ -262,7 +335,6 @@ For issues and questions:
 ## Changelog
 
 ### Version 0.0.1
-
 - Initial release
 - Genome annotation with Chloë
 - Reference-based validation
