@@ -888,7 +888,9 @@ def get_ref_gene_seqrecords_from_orders(orders, gene_median_lengths, gene_synony
         gene_synonyms (dict): Dictionary mapping gene names to standardized synonyms
         
     Returns:
-        dict: Dictionary with gene names as keys and lists of SeqRecord objects as values
+        dict: Dictionary with gene names as keys and lists of SeqRecord objects as values.
+        Multiple copies of the same gene from a single reference file are labeled with
+        _copy_1, _copy_2, etc. in their sequence IDs.
     """
     ref_cds_seqrecords = {}
     
@@ -904,6 +906,9 @@ def get_ref_gene_seqrecords_from_orders(orders, gene_median_lengths, gene_synony
 
     # Get path to the order genomes data directory
     data_dir = os.path.join(os.path.dirname(__file__), 'data', 'order_genomes')
+    
+    # Track gene copies per file for ID generation
+    gene_copy_counts = {}  # (mapped_gene_name, gbk_file) -> copy_count
     
     for order in orders:
         order_dir = os.path.join(data_dir, order)
@@ -951,10 +956,23 @@ def get_ref_gene_seqrecords_from_orders(orders, gene_median_lengths, gene_synony
                                 # Extract taxonomic information for ID generation
                                 order_tax, family_tax, genus_tax, species_tax = extract_taxonomic_info(record, order)
                                 
-                                # Create a SeqRecord for this gene
+                                # Track copy count for this gene in this file
+                                copy_key = (mapped_gene_name, gbk_file)
+                                if copy_key not in gene_copy_counts:
+                                    gene_copy_counts[copy_key] = 0
+                                gene_copy_counts[copy_key] += 1
+                                copy_number = gene_copy_counts[copy_key]
+                                
+                                # Create a SeqRecord for this gene with copy number
+                                base_id = f"{order_tax}_{family_tax}_{genus_tax}_{species_tax}_{mapped_gene_name}_{os.path.basename(gbk_file)}"
+                                if copy_number > 1:
+                                    gene_id = f"{base_id}_copy_{copy_number}"
+                                else:
+                                    gene_id = base_id
+                                
                                 gene_seqrecord = SeqRecord(
                                     seq=gene_seq,
-                                    id=f"{order_tax}_{family_tax}_{genus_tax}_{species_tax}_{mapped_gene_name}_{os.path.basename(gbk_file)}",
+                                    id=gene_id,
                                     description=f"{feature.type} from {order}/{os.path.basename(gbk_file)} (original: {gene_name})"
                                 )
                                 
@@ -994,7 +1012,9 @@ def get_ref_gene_seqrecords_from_default(gene_median_lengths, gene_synonyms=None
         gene_synonyms (dict): Dictionary mapping gene names to standardized synonyms
         
     Returns:
-        dict: Dictionary with gene names as keys and lists of SeqRecord objects as values
+        dict: Dictionary with gene names as keys and lists of SeqRecord objects as values.
+        Multiple copies of the same gene from a single reference file are labeled with
+        _copy_1, _copy_2, etc. in their sequence IDs.
     """
     ref_cds_seqrecords = {}
     
@@ -1010,6 +1030,9 @@ def get_ref_gene_seqrecords_from_default(gene_median_lengths, gene_synonyms=None
 
     # Get path to the default reference genomes directory
     data_dir = os.path.join(os.path.dirname(__file__), 'data', 'reference_genomes_default')
+    
+    # Track gene copies per file for ID generation
+    gene_copy_counts = {}  # (mapped_gene_name, gbk_file) -> copy_count
     gbk_files = glob.glob(os.path.join(data_dir, '*.gb*'))
     
     logger.debug(f"{"[DEBUG]:":10} Found {len(gbk_files)} GenBank files in default reference data directory")
@@ -1054,10 +1077,23 @@ def get_ref_gene_seqrecords_from_default(gene_median_lengths, gene_synonyms=None
                             # Extract taxonomic information for ID generation
                             order_tax, family_tax, genus_tax, species_tax = extract_taxonomic_info(record)
                             
-                            # Create a SeqRecord for this gene
+                            # Track copy count for this gene in this file
+                            copy_key = (mapped_gene_name, gbk_file)
+                            if copy_key not in gene_copy_counts:
+                                gene_copy_counts[copy_key] = 0
+                            gene_copy_counts[copy_key] += 1
+                            copy_number = gene_copy_counts[copy_key]
+                            
+                            # Create a SeqRecord for this gene with copy number
+                            base_id = f"{order_tax}_{family_tax}_{genus_tax}_{species_tax}_{mapped_gene_name}_{os.path.basename(gbk_file)}"
+                            if copy_number > 1:
+                                gene_id = f"{base_id}_copy_{copy_number}"
+                            else:
+                                gene_id = base_id
+                            
                             gene_seqrecord = SeqRecord(
                                 seq=gene_seq,
-                                id=f"{order_tax}_{family_tax}_{genus_tax}_{species_tax}_{mapped_gene_name}_{os.path.basename(gbk_file)}",
+                                id=gene_id,
                                 description=f"{feature.type} from default/{os.path.basename(gbk_file)} (original: {gene_name})"
                             )
                             
