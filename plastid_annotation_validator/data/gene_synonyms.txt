@@ -847,11 +847,12 @@ ribosomal protein S11 = rps11
 rps11 = rps11
 
 # rps12A (30S ribosomal protein S12)
-30S ribosomal protein S12 = rps12A
-ribosomal protein S12 = rps12A
-rps12 = rps12A
-rps12 3' end = rps12A
-small ribosomal protein 12 = rps12A
+30S ribosomal protein S12 = rps12
+ribosomal protein S12 = rps12
+rps12 = rps12
+rps12 3' end = rps12
+small ribosomal protein 12 = rps12
+rps12A = rps12
 
 # rps14 (30S ribosomal protein S14)
 30S ribosomal protein S14 = rps14
@@ -1340,19 +1341,19 @@ photosystem I assembly protein Ycf2 = ycf2
 ycf2 = ycf2
 
 # ycf3 (photosystem I assembly protein)
-Ycf3 = ycf3
-Ycf3 protein = ycf3
-photosystem I assembly protein Ycf3 = ycf3
-photosystem I assembly protein ycf3 = ycf3
-putative protein Ycf3 = ycf3
-ycf3 = ycf3
+Ycf3 = pafI
+Ycf3 protein = pafI
+photosystem I assembly protein Ycf3 = pafI
+photosystem I assembly protein ycf3 = pafI
+putative protein Ycf3 = pafI
+ycf3 = pafI
 
 # ycf4 (photosystem I assembly protein)
-Ycf4 = ycf4
-Ycf4 protein = ycf4
-photosystem I assembly protein Ycf4 = ycf4
-photosystem I assembly protein ycf4 = ycf4
-ycf4 = ycf4
+Ycf4 = pafII
+Ycf4 protein = pafII
+photosystem I assembly protein Ycf4 = pafII
+photosystem I assembly protein ycf4 = pafII
+ycf4 = pafII
 
 # ycf5 (hypothetical chloroplast reading frame 5)
 ycf5 = ycf5

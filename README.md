@@ -21,10 +21,10 @@ PAV is designed to process plastid genome assemblies, perform automated annotati
 ### Prerequisites
 
 - Python 3.7+
-- Chloë annotation tool
-- MAFFT (for alignments)
-- TrimAl (for backtranslation)
-- BLAST+ (for querying intergenic regions)
+- [Chloë](https://github.com/ian-small/Chloe.jl) annotation tool
+- [MAFFT](https://mafft.cbrc.jp/alignment/software/source.html) (for alignments)
+- [TrimAl](https://vicfero.github.io/trimal/index.html) (for backtranslation)
+- [BLAST+](https://www.ncbi.nlm.nih.gov/books/NBK569861/) (for querying intergenic regions)
 
 ### Setup
 
@@ -248,13 +248,16 @@ Reference gene lengths are stored in `data/plDNA_genes_median_lengths.csv` for v
 4. **Metadata TSV columns**: Ensure the TSV has exactly the required columns listed above
 5. **Memory issues**: Reduce `--pool` and `--threads` parameters
 
-
 ## Support
 
 For issues and questions:
 - Check the troubleshooting section
 - Review the documentation
 - Open an issue on GitHub
+
+## Misc links
+
+- ENA EMBL flatfile example: https://ena-docs.readthedocs.io/en/latest/submit/fileprep/flat-file-example.html
 
 ## Changelog
 
