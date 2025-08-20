@@ -1,0 +1,17 @@
+"${PREFIX}/bin/julia" --project=${PREFIX}/bin/chloe -e 'using Pkg; Pkg.rm("ArgParse")' >> "${PREFIX}/.messages.txt" 2>&1
+"${PREFIX}/bin/julia" --project=${PREFIX}/bin/chloe -e 'using Pkg; Pkg.rm("ArtifactUtils")' >> "${PREFIX}/.messages.txt" 2>&1
+"${PREFIX}/bin/julia" --project=${PREFIX}/bin/chloe -e 'using Pkg; Pkg.rm("BioSequences")' >> "${PREFIX}/.messages.txt" 2>&1
+"${PREFIX}/bin/julia" --project=${PREFIX}/bin/chloe -e 'using Pkg; Pkg.rm("CSV")' >> "${PREFIX}/.messages.txt" 2>&1
+"${PREFIX}/bin/julia" --project=${PREFIX}/bin/chloe -e 'using Pkg; Pkg.rm("CodecZlib")' >> "${PREFIX}/.messages.txt" 2>&1
+"${PREFIX}/bin/julia" --project=${PREFIX}/bin/chloe -e 'using Pkg; Pkg.rm("Crayons")' >> "${PREFIX}/.messages.txt" 2>&1
+"${PREFIX}/bin/julia" --project=${PREFIX}/bin/chloe -e 'using Pkg; Pkg.rm("DataFrames")' >> "${PREFIX}/.messages.txt" 2>&1
+"${PREFIX}/bin/julia" --project=${PREFIX}/bin/chloe -e 'using Pkg; Pkg.rm("Dates")' >> "${PREFIX}/.messages.txt" 2>&1
+"${PREFIX}/bin/julia" --project=${PREFIX}/bin/chloe -e 'using Pkg; Pkg.rm("FASTX")' >> "${PREFIX}/.messages.txt" 2>&1
+"${PREFIX}/bin/julia" --project=${PREFIX}/bin/chloe -e 'using Pkg; Pkg.rm("GenomicAnnotations")' >> "${PREFIX}/.messages.txt" 2>&1
+"${PREFIX}/bin/julia" --project=${PREFIX}/bin/chloe -e 'using Pkg; Pkg.rm("IntervalTrees")' >> "${PREFIX}/.messages.txt" 2>&1
+"${PREFIX}/bin/julia" --project=${PREFIX}/bin/chloe -e 'using Pkg; Pkg.rm("Logging")' >> "${PREFIX}/.messages.txt" 2>&1
+"${PREFIX}/bin/julia" --project=${PREFIX}/bin/chloe -e 'using Pkg; Pkg.rm("Printf")' >> "${PREFIX}/.messages.txt" 2>&1
+"${PREFIX}/bin/julia" --project=${PREFIX}/bin/chloe -e 'using Pkg; Pkg.rm("Statistics")' >> "${PREFIX}/.messages.txt" 2>&1
+"${PREFIX}/bin/julia" --project=${PREFIX}/bin/chloe -e 'using Pkg; Pkg.rm("StatsBase")' >> "${PREFIX}/.messages.txt" 2>&1
+"${PREFIX}/bin/julia" --project=${PREFIX}/bin/chloe -e 'using Pkg; Pkg.rm("UUIDs")' >> "${PREFIX}/.messages.txt" 2>&1
+"${PREFIX}/bin/julia" --project=${PREFIX}/bin/chloe -e 'using Pkg; Pkg.rm("XGBoost")' >> "${PREFIX}/.messages.txt" 2>&1

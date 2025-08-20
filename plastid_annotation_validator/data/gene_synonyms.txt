@@ -1,0 +1,1389 @@
+# Gene synonyms mapping
+# Format: extracted_gene_name = standard_gene_name
+# Generated from 732 GenBank files and manual curation
+# Organized by functional groups, sorted by RHS values
+# U to T variations handled for tRNA genes
+# locus_tag values excluded
+
+# ================================================================================
+# ACETYL-COA CARBOXYLASE (accD)
+# ================================================================================
+AccD = accD
+Acetyl-CoA carboxylase carboxyltransferase beta subunit = accD
+acetyl-CoA carboxlase carboxyltransferase beta subunit = accD
+acetyl-CoA carboxylase = accD
+acetyl-CoA carboxylase beta subunit = accD
+acetyl-CoA carboxylase carboxyl transferase beta = accD
+acetyl-CoA carboxylase carboxyl transferase betasubunit = accD
+acetyl-CoA carboxylase carboxyltransferase beta = accD
+acetyl-CoA carboxylase carboxyltransferase beta subunit = accD
+acetyl-CoA carboxylase subunit = accD
+acetyl-CoA carboxylase subunit beta = accD
+acetyl-CoA carboxyltransferase beta subunit = accD
+acetyl-coenzyme A carboxylase carboxyl transferase subunit beta = accD
+accD = accD
+beta-carboxyl transferase subunit of acetyl-CoA carboxylase = accD
+carboxytransferase beta subunit = accD
+
+# ================================================================================
+# ATP SYNTHASE COMPLEX (atp genes)
+# ================================================================================
+
+# atpA (ATP synthase CF1 alpha subunit)
+AT Psynthase CF1 alpha subunit = atpA
+ATPA = atpA
+ATP synthase CF0 A chain = atpA
+ATP synthase CF0 A subunit = atpA
+ATP synthase CF0 subunit A = atpA
+ATP synthase CF1 alpha chain = atpA
+ATP synthase CF1 alpha subunit = atpA
+ATP synthase CF1 subunit alpha = atpA
+ATP synthase CF1alpha subunit = atpA
+ATP synthase CFU A subunit = atpA
+ATP synthase subunit a = atpA
+ATP synthase subunit alpha = atpA
+ATPase a subunit = atpA
+ATPase alpha subunit = atpA
+AtpA = atpA
+AtpL = atpA
+atpA = atpA
+atpL = atpA
+CF1 alpha subunit = atpA
+CF1 subunit alpha = atpA
+PsaL = atpA
+
+# atpB (ATP synthase CF1 beta subunit)
+ATPB = atpB
+ATP synthase CF1 beta chain = atpB
+ATP synthase CF1 beta subunit = atpB
+ATP synthase CF1 subunit beta = atpB
+ATP synthase subunit beta = atpB
+ATPase beta subunit = atpB
+AtpB = atpB
+atpB = atpB
+CF1 subunit beta = atpB
+
+# atpE (ATP synthase CF1 epsilon subunit)
+ATPE = atpE
+ATP synthase CF1 epsilon chain = atpE
+ATP synthase CF1 epsilon subunit = atpE
+ATP synthase CF1 subunit epsilon = atpE
+ATP synthase CF1epsilon subunit = atpE
+ATP synthase epsilon subunit = atpE
+ATPase epsilon subunit = atpE
+AtpE = atpE
+atpE = atpE
+CF1 subunit epsilon = atpE
+
+# atpF (ATP synthase CF0 B subunit)
+ATPF = atpF
+ATP synthase CF0 B chain = atpF
+ATP synthase CF0 B chain subunit I = atpF
+ATP synthase CF0 B subunit = atpF
+ATP synthase CF0 B subunit subunit I = atpF
+ATP synthase CF0 subunit B = atpF
+ATP synthase subunit b = atpF
+ATP systhase CFO B subunit = atpF
+AtpF = atpF
+atpF = atpF
+
+# atpH (ATP synthase CF0 C subunit)
+ATPH = atpH
+ATP synthase CF0 A chain subunit IV = atpH
+ATP synthase CF0 A subunit III = atpH
+ATP synthase CF0 A subunit subunit IV = atpH
+ATP synthase CF0 C chain = atpH
+ATP synthase CF0 C chain subunit III = atpH
+ATP synthase CF0 C subunit = atpH
+ATP synthase CF0 C subunit III = atpH
+ATP synthase CF0 C subunit subunit III = atpH
+ATP synthase CF0 subunit C = atpH
+ATP synthase CF0 subunit III = atpH
+ATP synthase CF0 subunit IV = atpH
+ATP synthase CFO subunit III = atpH
+ATP synthase CFO subunit IV = atpH
+ATP synthase subunit c = atpH
+ATP systhase CFO C subunit = atpH
+ATPase III subunit = atpH
+ATPase subunit III = atpH
+ATPase subunit IV = atpH
+ATPase sunthase IV subunit = atpH
+AtpH = atpH
+atpH = atpH
+CF0 subunit III = atpH
+CF0 subunit IV = atpH
+
+# atpI (ATP synthase CF0 subunit I)
+ATPI = atpI
+ATP synthase CF0 subunit I = atpI
+ATPase I subunit = atpI
+ATPase subunit I = atpI
+AtpI = atpI
+atpI = atpI
+CF0 subunit I = atpI
+synthase CF0 subunit I = atpI
+
+# ================================================================================
+# CYTOCHROME C SYNTHESIS (ccs genes)
+# ================================================================================
+CcsA = ccsA
+c-type cytochrome synthesis protein = ccsA
+ccsA = ccsA
+cytochrome c biogenesis protein = ccsA
+cytochrome c biogenesis protein ccsA = ccsA
+cytochrome c biogenesis/heme attachment protein = ccsA
+cytochrome c heme attachment protein = ccsA
+cytochrome cheme attachment protein = ccsA
+heme attachment to plastid cytochrome c = ccsA
+potential heme-binding protein = ccsA
+putative heme-binding protein = ccsA
+
+# ================================================================================
+# CHLOROPLAST ENVELOPE MEMBRANE (cem genes)
+# ================================================================================
+CemA = cemA
+Cem4 = cemA
+cemA = cemA
+cem4 = cemA
+chloroplast envelope membrane protein = cemA
+chloroplast envelope protein = cemA
+envelope membrane carbon uptake protein = cemA
+envelope membrane protein = cemA
+potassium/proton antiporter cemA = cemA
+
+# ================================================================================
+# CLP PROTEASE (clp genes)
+# ================================================================================
+ATP dependent clp protease proteolytic subunit = clpP1
+ATP-dependent Clp protease proteolytic = clpP1
+ATP-dependent Clp protease proteolytic subunit = clpP1
+ATP-dependent Clp protease proteolytic subunit 1 = clpP1
+ATP-dependent Clp protease proteolytic subunit1 = clpP1
+ATP-dependent clp protease proteolytic subunit = clpP1
+ATP-dependent protease = clpP1
+ATP-dependent protease proteolytic subunit = clpP1
+ATP-dependent protease subunit = clpP1
+ClpP = clpP1
+ClpP1 = clpP1
+ClpP-like protease = clpP1
+Clp protease catalytic subunit = clpP1
+Clp protease proteolytic subunit = clpP1
+caseinolytic peptidase P1 = clpP1
+clpP = clpP1
+clpP protease proteolytic subunit = clpP1
+clpP-like protease = clpP1
+clpP1 = clpP1
+clp protease proteolytic subunit = clpP1
+
+# ================================================================================
+# TRANSLATION INITIATION FACTOR (inf genes)
+# ================================================================================
+InfA = infA
+Translation initiation factor IF-1 = infA
+Translation initiation factor IF-1, chloroplastic = infA
+Translational initiation factor = infA
+infA = infA
+initial transcription factor = infA
+initiation factor 1 = infA
+translantional initiation factor 1 = infA
+translation alinitiation factor 1 = infA
+translation initiation factor 1 = infA
+translational initiation factor 1 = infA
+translational initiation factor IF1 = infA
+
+# ================================================================================
+# MATURASE K (matK)
+# ================================================================================
+matK = matK
+maturase K = matK
+
+# ================================================================================
+# NADH DEHYDROGENASE COMPLEX (ndh genes)
+# ================================================================================
+
+# ndhA (NADH dehydrogenase subunit 1)
+NAD(P)H-quinone oxidoreductase subunit 1 = ndhA
+NADH dehydrogenase ND1 = ndhA
+NADH dehydrogenase ND1 subunit = ndhA
+NADH dehydrogenase subunit = ndhA
+NADH dehydrogenase subunit 1 = ndhA
+NADH dehydrogenase subunit A = ndhA
+NADH dehyrogenase subunit 1 = ndhA
+NADH-plastoquinone oxidoreductase chain 1 = ndhA
+NADH-plastoquinone oxidoreductase subunit = ndhA
+NADH-plastoquinone oxidoreductase subunit 1 = ndhA
+NADH-plastoquinone oxidoreductase subunit A = ndhA
+NdhA = ndhA
+ndhA = ndhA
+
+# ndhB (NADH dehydrogenase subunit 2)
+19KD = ndhB
+19k = ndhB
+NAD(P)H-quinone oxidoreductase subunit 2 = ndhB
+NADH dehydrogenase 18 kDa subunit = ndhB
+NADH dehydrogenase 18kD subunit = ndhB
+NADH dehydrogenase 19 kDa subunit = ndhB
+NADH dehydrogenase 19kD subunit = ndhB
+NADH dehydrogenase ND2 = ndhB
+NADH dehydrogenase ND2 subunit = ndhB
+NADH dehydrogenase subunit 2 = ndhB
+NADH dehydrogenase subunit B = ndhB
+NADH dehydrogenase subunit B012 = ndhB
+NADH-plastoquinone oxidoreductase chain 2 = ndhB
+NADH-plastoquinone oxidoreductase subunit 2 = ndhB
+NADH-plastoquinone oxidoreductase subunit 2 GeneID:37626217 = ndhB
+NdhB = ndhB
+ndhB = ndhB
+ndhB_exon1 = ndhB
+ndhB_gene = ndhB
+
+# ndhC (NADH dehydrogenase subunit 3)
+NAD(P)H-quinone oxidoreductase subunit 3 = ndhC
+NADH dehydrogenase 30kD subunit = ndhC
+NADH dehydrogenase D3 = ndhC
+NADH dehydrogenase ND3 subunit = ndhC
+NADH dehydrogenase subunit 3 = ndhC
+NADH dehydrogenase subunit C = ndhC
+NADH plastoquinone oxidoreductase subunit 3 = ndhC
+NADH-plastoquinone oxidoreductase chain 3 = ndhC
+NADH-plastoquinone oxidoreductase subunit 3 = ndhC
+NADH-plastoquinone oxidoreductase subunit C = ndhC
+NADH-quinone oxidoreductase subunit C = ndhC
+NdhC = ndhC
+ndhC = ndhC
+
+# ndhD (NADH dehydrogenase subunit 4)
+NAD(P)H-quinone oxidoreductase subunit 4 = ndhD
+NADH dehydrogenase 32 kDa subunit = ndhD
+NADH dehydrogenase 32kD subunit = ndhD
+NADH dehydrogenase ND4 = ndhD
+NADH dehydrogenase ND4 subunit = ndhD
+NADH dehydrogenase subunit 4 = ndhD
+NADH dehydrogenase subunit D = ndhD
+NADH dehydroenase subunit D = ndhD
+NADH-plastoquinone oxidoreductase chain 4 = ndhD
+NADH-plastoquinone oxidoreductase subunit 4 = ndhD
+NADH-plastoquinone oxidoreductase subunit D = ndhD
+NdhD = ndhD
+ndhD = ndhD
+
+# ndhE (NADH dehydrogenase subunit 6)
+NAD(P)H-quinone oxidoreductase subunit 6 = ndhE
+NADH dehydrogenase ND6 = ndhE
+NADH dehydrogenase ND6 subunit = ndhE
+NADH dehydrogenase subunit 6 = ndhE
+NADH dehydrogenase subunit E = ndhE
+NADH dehydroenase subunit E = ndhE
+NADH dehyrogenase subunit 6 = ndhE
+NADH plastoquinone oxidoreductase subunit 6 = ndhE
+NADH-plastoquinone oxidoreductase chain 6 = ndhE
+NADH-plastoquinone oxidoreductase subunit 6 = ndhE
+NADH-plastoquinone oxidoreductase subunit E = ndhE
+NADH-plastoquinone oxiductase subunit 6 = ndhE
+NAHD-plastoquinone oxidoreductase subunit 6 = ndhE
+NdhE = ndhE
+ndhE = ndhE
+
+# ndhF (NADH dehydrogenase subunit 5)
+38.7KD protein = ndhF
+38.7k = ndhF
+39K = ndhF
+39k = ndhF
+NAD(P)H-quinone oxidoreductase subunit 5 = ndhF
+NADH dehydrogenase 49 kDa subunit = ndhF
+NADH dehydrogenase 49KDa protein = ndhF
+NADH dehydrogenase 49KDa subunit = ndhF
+NADH dehydrogenase 49kD subunit = ndhF
+NADH dehydrogenase 49kDa subunit = ndhF
+NADH dehydrogenase F = ndhF
+NADH dehydrogenase ND5 = ndhF
+NADH dehydrogenase ND5 subunit = ndhF
+NADH dehydrogenase subunit 49KDa subunit = ndhF
+NADH dehydrogenase subunit 5 = ndhF
+NADH dehydrogenase subunit F = ndhF
+NADH dehydroenase subunit F = ndhF
+NADH-plastoquinone oxidoreductase 49 kDa subunit = ndhF
+NADH-plastoquinone oxidoreductase chain 5 = ndhF
+NADH-plastoquinone oxidoreductase subunit 5 = ndhF
+NADH-plastoquinone oxidoreductase subunit F = ndhF
+NAHD-plastoquinone oxidoreductase subunit 5 = ndhF
+NdhF = ndhF
+ndhF = ndhF
+
+# ndhG (NADH dehydrogenase subunit 4L)
+NAD(P)H-quinnone oxidoreductase subunit 4L = ndhG
+NAD(P)H-quinone oxidoreductase subunit 4L = ndhG
+NADH dehydrogenase ND4L = ndhG
+NADH dehydrogenase ND4L subunit = ndhG
+NADH dehydrogenase subunit 4L = ndhG
+NADH dehydrogenase subunit G = ndhG
+NADH dehydroenase subunit G = ndhG
+NADH plastoquinone oxidoreductase subunit 4L = ndhG
+NADH-plastoquinone oxidoreductase chain 4L = ndhG
+NADH-plastoquinone oxidoreductase subunit 4L = ndhG
+NADH-plastoquinone oxidoreductase subunit G = ndhG
+NAHD-plastoquinone oxidoreductase subunit 4L = ndhG
+NdhG = ndhG
+ndhG = ndhG
+
+# ndhH (NADH dehydrogenase subunit H)
+NAD(P)H-quinone oxidoreductase subunit H = ndhH
+NADH dehydrogenase subunit 7 = ndhH
+NADH dehydrogenase subunit H = ndhH
+NADH plastoquinone oxidoreductase subunit 7 = ndhH
+NADH-plastoquinone oxidoreductase subunit 7 = ndhH
+NADH-plastoquinone oxidoreductase subunit H = ndhH
+NdhH = ndhH
+ndhH = ndhH
+ndhH' = ndhH
+
+# ndhI (NADH dehydrogenase subunit I)
+NAD(P)H-quinone oxidoreductase subunit I = ndhI
+NADH dehydrogenase subunit I = ndhI
+NADH dehydroenase subunit I = ndhI
+NADH plastoquinone oxidoreductase subunit I = ndhI
+NADH-plastoquinone oxidoreductase subunit I = ndhI
+NAHD-plastoquinone oxidoreductase subunit I = ndhI
+NdhI = ndhI
+ndhI = ndhI
+
+# ndhJ (NADH dehydrogenase subunit J)
+NAD(P)H-quinone oxidoreductase subunit J = ndhJ
+NADH dehydrogenase subunit J = ndhJ
+NADH plastoquinone oxidoreductase subunit J = ndhJ
+NADH-plastoquinone oxidoreductase subunit J = ndhJ
+NdhJ = ndhJ
+ndhJ = ndhJ
+
+# ndhK (NADH dehydrogenase subunit K)
+NAD(P)H-quinone oxidoreductase subunit K = ndhK
+NADH dehydrogenase subunit K = ndhK
+NADH plastoquinone oxidoreductase subunit K = ndhK
+NADH-plastoquinone oxidoreductase subunit K = ndhK
+NdhK = ndhK
+ndhK = ndhK
+
+# ================================================================================
+# PHOTOSYSTEM BIOGENESIS FACTORS (paf, pbf genes)
+# ================================================================================
+pafI = pafI
+pafII = pafII
+Pbf1 = pbf1
+pbf1 = pbf1
+pbfI = pbfI
+photosystem biogenesis factor 1 = pbf1
+photosystem biogenesis facor = pbf1
+prolamin-box binding factor 1 = pbf1
+
+# ================================================================================
+# CYTOCHROME b6/f COMPLEX (pet genes)
+# ================================================================================
+
+# petA (cytochrome f)
+PetA = petA
+apocytochrome f = petA
+component of cytochrome b6/f complex = petA
+cytochrome b6/f complex protein A = petA
+cytochrome f = petA
+petA = petA
+
+# petB (cytochrome b6)
+Cytochrome b6 = petB
+PetB = petB
+cytochrome B6 = petB
+cytochrome b/f = petB
+cytochrome b6 = petB
+cytochrome b6/f complex = petB
+cytochrome b6/f complex protein B = petB
+petB = petB
+
+# petD (cytochrome b6-f complex subunit IV)
+PetD = petD
+cytochrome b6-f complex subunit 4 = petD
+cytochrome b6-f complex subunit IV = petD
+cytochrome b6/f complex protein D = petD
+cytochrome b6/f complex subunit 4 = petD
+cytochrome b6/f complex subunit D = petD
+cytochrome b6/f complex subunit IV = petD
+cytochrome b6/f subunit D = petD
+cytochrome b6/f subunit IV = petD
+cytochrome b6f complex subunit IV = petD
+cytochrome b6f subunit IV = petD
+petD = petD
+
+# petG (cytochrome b6-f complex subunit V)
+PetG = petG
+cytochrome b6-f complex subunit 5 = petG
+cytochrome b6-f complex subunit V = petG
+cytochrome b6-f complex, subunit V = petG
+cytochrome b6/f complex subunit 5 = petG
+cytochrome b6/f complex subunit V = petG
+cytochrome b6/f subunit G = petG
+cytochrome b6f complex subunit V = petG
+cytochrome b6f subunit G = petG
+petG = petG
+
+# petL (cytochrome b6-f complex subunit VI)
+PetL = petL
+cytochrome b6-f complex subunit 6 = petL
+cytochrome b6-f complex subunit VI = petL
+cytochrome b6/f complex subunit 8 = petL
+cytochrome b6/f complex subunit L = petL
+cytochrome b6/f complex subunit VI = petL
+cytochrome b6/f subunit L = petL
+cytochrome b6f complex subunit VI = petL
+cytochrome b6f subunit L = petL
+petL = petL
+
+# petN (cytochrome b6/f complex subunit N)
+PetN = petN
+cytochrome b6-f complex subunit 8 = petN
+cytochrome b6-f complex subunit VIII = petN
+cytochrome b6/f complex 3.5 kDa subunit = petN
+cytochrome b6/f complex 3.5kD subunit = petN
+cytochrome b6/f complex subunit N = petN
+cytochrome b6/f complex subunit VIII = petN
+cytochrome b6/f subunit N = petN
+cytochrome b6f complex subunit VIII = petN
+cytochrome b6f subunit N = petN
+petN = petN
+
+# ================================================================================
+# PHOTOSYSTEM I (psa genes)
+# ================================================================================
+
+# psaA (photosystem I P700 apoprotein A1)
+PSI P700 A1 apoprotein = psaA
+PSI P700 apoprotein A1 = psaA
+PsaA = psaA
+photosystem I P700 apoprotein A1 = psaA
+photosystem I P700 chlorophy11 A apoprotein A1 = psaA
+photosystem I P700 chlorophyll A apoprotein A1 = psaA
+photosystem I P700 chlorophyll a apoprotein A1 = psaA
+photosystem I assembly protein Ycf1 = psaA
+photosystem I p700 apoprotein A1 = psaA
+photosystem I subunit A = psaA
+photosystem IP700 apoprotein A1 = psaA
+psaA = psaA
+
+# psaB (photosystem I P700 apoprotein A2)
+PSI P700 A2 apoprotein = psaB
+PSI P700 apoprotein A2 = psaB
+PsaB = psaB
+photosystem I P700 apoprotein A2 = psaB
+photosystem I P700 chlorophy11 A apoprotein A2 = psaB
+photosystem I P700 chlorophyll A apoprotein A2 = psaB
+photosystem I P700 chlorophyll a apoprotein A2 = psaB
+photosystem I subunit B = psaB
+photosystem IP700 apoprotein A2 = psaB
+psaB = psaB
+
+# psaC (photosystem I iron-sulfur center)
+PsaC = psaC
+PSI subunit VII = psaC
+photosystem I iron-sulfur center = psaC
+photosystem I iron-sulfur center subunit VII = psaC
+photosystem I iron-sulfur protein PsaC = psaC
+photosystem I protein C = psaC
+photosystem I subunit C = psaC
+photosystem I subunit VII = psaC
+psaC = psaC
+
+# psaI (photosystem I subunit VIII/IX)
+PSI 9 kDa protein = psaI
+PSI 9KDa protein = psaI
+PSI 9kD protein = psaI
+PSI I protein = psaI
+PSI I-protein = psaI
+PSI reaction center subunit IX = psaI
+PSI reaction center subunit VIII = psaI
+PSI reaction centre subunit IX = psaI
+PSI reaction centre subunit VIII = psaI
+PSI subunit IX = psaI
+PSI subunit VIII = psaI
+Photosystem I reaction center subunit IX = psaI
+PsaI = psaI
+photosystem I 9kDa protein = psaI
+photosystem I assembly factor I = psaI
+photosystem I assembly factor II = psaI
+photosystem I assembly protein = psaI
+photosystem I subunit I = psaI
+photosystem I subunit IX = psaI
+photosystem I subunit VIII = psaI
+psaI = psaI
+
+# psaJ (photosystem I subunit J)
+PSI J protein = psaJ
+PSI J-protein = psaJ
+PsaJ = psaJ
+photosystem I protein J = psaJ
+photosystem I subunit J = psaJ
+psaJ = psaJ
+
+# ================================================================================
+# PHOTOSYSTEM II (psb genes)
+# ================================================================================
+
+# psbA (photosystem II D1 protein)
+PSII 32 KDa protein = psbA
+PSII 32 kDa protein = psbA
+PSII D1 protein = psbA
+PSII component = psbA
+PsbA = psbA
+Photosystem II protein D1 = psbA
+photosystem II P680 chlorophyll A apoprotein = psbA
+photosystem II P680 chlorophyll A apoprotein; PSII 47 kDa protein = psbA
+photosystem II Q protein (D1) = psbA
+photosystem II Q(b) protein (D1) = psbA
+photosystem II p680 chlorophyll A apoprotein = psbA
+photosystem II p680 chlorophyll A apoprotein (CP-47) = psbA
+photosystem II protein D1 = psbA
+photosystem II protein D1 precursor = psbA
+photosystem II reaction center protein D1 = psbA
+photosystem II subunit D1 = psbA
+psbA = psbA
+
+# psbB (photosystem II CP47)
+PSII 44 kDa protein = psbB
+PSII 44kd protein = psbB
+PSII 47 kDa protein = psbB
+PSII 47KDa protein = psbB
+PSII 47kD protein = psbB
+PsbB = psbB
+Photosystem II protein B = psbB
+photosystem II 44 kDa apoprotein = psbB
+photosystem II 44 kDa apoprotein (P6) = psbB
+photosystem II 44 kDa protein = psbB
+photosystem II 47 kDa protein = psbB
+photosystem II 47 kDa protein (CP47) = psbB
+photosystem II 47kDa protein = psbB
+photosystem II CP47 = psbB
+photosystem II CP47 chlorophyll apoprotein = psbB
+photosystem II CP47 reaction center protein = psbB
+photosystem II subunit B = psbB
+photosystem II subunit CP47 = psbB
+psbB = psbB
+
+# psbC (photosystem II CP43)
+PSII 43 KDa protein = psbC
+PSII 43 kDa protein = psbC
+PsbC = psbC
+photosystem II 43 kDa protein = psbC
+photosystem II 43 kDa protein (CP43) = psbC
+photosystem II CP43 chlorophyll apo protein = psbC
+photosystem II CP43 chlorophyll apoprotein = psbC
+photosystem II CP43 protein = psbC
+photosystem II CP43 reaction center protein = psbC
+photosystem II protein CP43 chlorophyll = psbC
+photosystem II subunit CP43 = psbC
+psbC = psbC
+
+# psbD (photosystem II D2 protein)
+PSII D2 protein = psbD
+PsbD = psbD
+photosystem II D2 protein = psbD
+photosystem II protein D2 = psbD
+photosystem II reaction center protein D2 = psbD
+photosystem II subunit D2 = psbD
+psbD = psbD
+
+# psbE (cytochrome b559 alpha subunit)
+PSII cytochrome b559 = psbE
+PSII cytochrome b559 8kD subunit = psbE
+PSII reaction center subunit V = psbE
+PSII subunit V = psbE
+PsbE = psbE
+cytochrome b 559 subunit alpha = psbE
+cytochrome b559 alpha chain = psbE
+cytochrome b559 alpha subunit = psbE
+cytochrome b559 component alpha subunit = psbE
+cytochrome b559 subunit alpha = psbE
+photosystem II cytochrome b559 alpha submit = psbE
+photosystem II cytochrome b559 alpha subunit = psbE
+photosystem II cytochrome b559 subunit alpha = psbE
+photosystem II protein E = psbE
+photosystem II subunit E = psbE
+psbE = psbE
+
+# psbF (cytochrome b559 beta subunit)
+PSII cytochrome b559 4kD subunit = psbF
+PSII reaction center subunit VI = psbF
+PSII subunit VI = psbF
+PsbF = psbF
+cytochrome b 559 subunit beta = psbF
+cytochrome b559 beta chain = psbF
+cytochrome b559 beta subunit = psbF
+cytochrome b559 subunit beta = psbF
+photosystem II cytochrome b559 beta submit = psbF
+photosystem II cytochrome b559 beta subunit = psbF
+photosystem II cytochrome b559 subunit beta = psbF
+photosystem II protein F = psbF
+photosystem II subunit F = psbF
+psbF = psbF
+
+# psbH (photosystem II 10 kDa phosphoprotein)
+PSII 10 kDa phosphoprotein = psbH
+PSII 10KDa phosphoprotein = psbH
+PSII 10kD phosphoprotein = psbH
+PsbH = psbH
+photosystem II 10 kDa phosphoprotein = psbH
+photosystem II phospho protein = psbH
+photosystem II phosphoprotein = psbH
+photosystem II protein H = psbH
+photosystem II reaction center protein H = psbH
+photosystem II subunit H = psbH
+psbH = psbH
+
+# psbI (photosystem II protein I)
+PSII I protein = psbI
+PSII I-protein = psbI
+PsbI = psbI
+photosystem II protein I = psbI
+photosystem II protein PsbI protein = psbI
+photosystem II protein psbI protein = psbI
+photosystem II reaction center protein I = psbI
+photosystem II subunit I = psbI
+psbI = psbI
+
+# psbJ (photosystem II protein J)
+PSII J protein = psbJ
+PSII J-protein = psbJ
+PSII reaction center subunit X = psbJ
+PsbJ = psbJ
+photosystem II protein J = psbJ
+photosystem II reaction center protein J = psbJ
+photosystem II subunit J = psbJ
+psbJ = psbJ
+
+# psbK (photosystem II protein K)
+PSII K protein = psbK
+PSII K-protein = psbK
+PsbK = psbK
+photosystem II protein K = psbK
+photosystem II protein PsbK = psbK
+photosystem II proteinK = psbK
+photosystem II reaction center protein K = psbK
+photosystem II subunit K = psbK
+psbK = psbK
+
+# psbL (photosystem II protein L)
+PSII L protein = psbL
+PSII L-protein = psbL
+PSII reaction center subunit XII = psbL
+PsbL = psbL
+photosystem II protein L = psbL
+photosystem II reaction center protein L = psbL
+photosystem II subunit L = psbL
+psbL = psbL
+
+# psbM (photosystem II low molecular weight protein)
+PSII M protein = psbM
+PSII M-protein = psbM
+PSII low MW protein = psbM
+PSII low MW protein M = psbM
+PsbM = psbM
+photosystem II M protein = psbM
+photosystem II protein M = psbM
+photosystem II reaction center M protein = psbM
+photosystem II reaction center protein M = psbM
+photosystem II subunit M = psbM
+psbM = psbM
+
+# psbN (photosystem II protein N)
+PSII N protein = psbN
+PSII N-protein = psbN
+PsbN = psbN
+photosystem II protein N = psbN
+photosystem II reaction center N = psbN
+photosystem II reaction center N protein = psbN
+photosystem II reaction center protein N = psbN
+photosystem II subunit N = psbN
+psbN = psbN
+
+# psbT (photosystem II protein T)
+PSII T protein = psbT
+PSII T-protein = psbT
+PsbT = psbT
+photosystem II protein T = psbT
+photosystem II reaction center T = psbT
+photosystem II reaction center protein T = psbT
+photosystem II subunit T = psbT
+psbT = psbT
+
+# psbZ (photosystem II protein Z)
+PSII Z protein = psbZ
+PSII Z-protein = psbZ
+PsbZ = psbZ
+Photosystem II protein Z = psbZ
+photosystem II protein Z = psbZ
+photosystem II protein VI = psbZ
+photosystem II protein z = psbZ
+photosystem II reaction center Z protein = psbZ
+photosystem II reaction center protein Z = psbZ
+photosystem II subunit Z = psbZ
+psbZ = psbZ
+
+# ================================================================================
+# RIBULOSE-1,5-BISPHOSPHATE CARBOXYLASE/OXYGENASE LARGE SUBUNIT (rbcL)
+# ================================================================================
+large subunit of riblose-1,5-bisphosphate carboxylase/oxygenase = rbcL
+rbcL = rbcL
+ribulose 1,5-bisphosphate carboxylase/oxygenase large subunit = rbcL
+ribulose 15 bisphosphate carboxylase oxygenase large subunit = rbcL
+ribulose bisophosphate carboxylase = rbcL
+ribulose bisophosphate carboxylase large chain = rbcL
+ribulose-1 = rbcL
+ribulose-1,5-bisphosphate carboxylase/oxygenase large subunit = rbcL
+ribulose-1,5-bisphosphate carboxylaseoxygenase large subunit = rbcL
+
+# ================================================================================
+# RNA POLYMERASE (rpo genes)
+# ================================================================================
+
+# rpoA (RNA polymerase alpha subunit)
+DNA-directed RNA polymerase alpha chain = rpoA
+RNA polymerase alpha chain = rpoA
+RNA polymerase alpha subunit = rpoA
+RNA polymerase subunit A = rpoA
+RNA polymerase subunit alpha = rpoA
+RpoA = rpoA
+rpoA = rpoA
+
+# rpoB (RNA polymerase beta subunit)
+DNA-directed RNA polymerase beta chain = rpoB
+RNA polymerase beta = rpoB
+RNA polymerase beta I subunit = rpoB
+RNA polymerase beta chain = rpoB
+RNA polymerase beta subunit = rpoB
+RNA polymerase beta subunit-1 = rpoB
+RNA polymerase subunit beta = rpoB
+RpoB = rpoB
+rpoB = rpoB
+
+# rpoC1 (RNA polymerase beta' subunit)
+DNA-directed RNA polymerase beta' chain = rpoC1
+RNA polymerase beta II subunit = rpoC1
+RNA polymerase beta subunit-2 = rpoC1
+RNA polymerase beta' subunit = rpoC1
+RNA polymerase beta' subunit-1 = rpoC1
+RNA polymerase subunit beta' = rpoC1
+RpoC1 = rpoC1
+rpoC1 = rpoC1
+rpoc1 = rpoC1
+
+# rpoC2 (RNA polymerase beta'' subunit)
+DNA-directed RNA polymerase beta'' chain = rpoC2
+RNA polymerase beta' subunit-2 = rpoC2
+RNA polymerase beta'' subunit = rpoC2
+RNA polymerase subunit beta'' = rpoC2
+RpoC2 = rpoC2
+rpoC2 = rpoC2
+rpoc2 = rpoC2
+
+# ================================================================================
+# RIBOSOMAL PROTEINS LARGE SUBUNIT (rpl genes)
+# ================================================================================
+
+# rpl14 (50S ribosomal protein L14)
+30S ribosomal protein L14 = rpl14
+50S ribosomal protein L14 = rpl14
+ribosomal protein L14 = rpl14
+rpl14 = rpl14
+
+# rpl16 (50S ribosomal protein L16)
+50S ribosomal protein L16 = rpl16
+ribosomal protein L16 = rpl16
+rpl16 = rpl16
+
+# rpl2 (50S ribosomal protein L2)
+50S ribosomal protein L2 = rpl2
+ribosomal protein L2 = rpl2
+ribosomal protein L2 GeneID:37626224 = rpl2
+rpl2 = rpl2
+
+# rpl20 (50S ribosomal protein L20)
+50S ribosomal protein L20 = rpl20
+ribosomal protein L20 = rpl20
+rpl20 = rpl20
+
+# rpl22 (50S ribosomal protein L22)
+50S ribosomal protein L22 = rpl22
+ribosomal protein L22 = rpl22
+rpl22 = rpl22
+rpl22-fragment = rpl22
+
+# rpl23 (50S ribosomal protein L23)
+50S ribosomal protein L23 = rpl23
+Ribosomal Protein L32 = rpl23
+chloroplast ribosomal protein L23 = rpl23
+ribosomal protein L23 = rpl23
+ribosomal protein L23 GeneID:37626222 = rpl23
+rpl23 = rpl23
+
+# rpl32 (50S ribosomal protein L32)
+50S ribosomal protein L32 = rpl32
+large ribosomal subunit protein bL32c = rpl32
+ribosomal protein L32 = rpl32
+rpl32 = rpl32
+
+# rpl33 (50S ribosomal protein L33)
+50S ribosomal protein L33 = rpl33
+ribosomal protein L33 = rpl33
+rpl33 = rpl33
+
+# rpl36 (50S ribosomal protein L36)
+50S ribosomal protein L36 = rpl36
+ribosomal protein L36 = rpl36
+rpl36 = rpl36
+
+# ================================================================================
+# RIBOSOMAL PROTEINS SMALL SUBUNIT (rps genes)
+# ================================================================================
+
+# rps11 (30S ribosomal protein S11)
+30S ribosomal protein S11 = rps11
+chloroplast ribosomal protein S11 = rps11
+ribosomal protein S11 = rps11
+rps11 = rps11
+
+# rps12A (30S ribosomal protein S12)
+30S ribosomal protein S12 = rps12A
+ribosomal protein S12 = rps12A
+rps12 = rps12A
+rps12 3' end = rps12A
+small ribosomal protein 12 = rps12A
+
+# rps14 (30S ribosomal protein S14)
+30S ribosomal protein S14 = rps14
+chloroplast ribosomal protein S14 = rps14
+ribosomal protein S14 = rps14
+rps14 = rps14
+small ribosomal subunit protein uS14c = rps14
+
+# rps15 (30S ribosomal protein S15)
+30S ribosomal protein S15 = rps15
+ribosomal protein S15 = rps15
+ribosoal protein S15 = rps15
+rps15 = rps15
+
+# rps16 (30S ribosomal protein S16)
+30S ribosomal protein S16 = rps16
+ribosomal protein S16 = rps16
+rps16 = rps16
+small ribosomal subunit protein bS16c = rps16
+
+# rps18 (30S ribosomal protein S18)
+30S ribosomal protein S18 = rps18
+chloroplast ribosomal protein S18 = rps18
+ribosomal protein S18 = rps18
+rps18 = rps18
+
+# rps19 (30S ribosomal protein S19)
+30S ribosomal protein S19 = rps19
+40S ribosomal protein S19 = rps19
+ribosomal protein S19 = rps19
+rps19 = rps19
+
+# rps2 (30S ribosomal protein S2)
+30S ribosomal protein S2 = rps2
+chloroplast ribosomal protein S2 = rps2
+ribosomal protein S2 = rps2
+rps2 = rps2
+small ribosomal subunit protein uS2c = rps2
+
+# rps3 (30S ribosomal protein S3)
+30S ribosomal protein S3 = rps3
+chloroplast ribosomal protein S3 = rps3
+ribosomal protein S3 = rps3
+rps3 = rps3
+small ribosomal protein 3 = rps3
+
+# rps4 (30S ribosomal protein S4)
+30S ribosomal protein S4 = rps4
+chloroplast ribosomal protein S4 = rps4
+ribosomal protein S4 = rps4
+rps4 = rps4
+small ribosomal protein 4 = rps4
+small ribosomal subunit protein uS4c = rps4
+
+# rps7 (30S ribosomal protein S7)
+30S ribosomal protein S7 = rps7
+chloroplast ribosomal protein S7 = rps7
+ribosomal protein S7 = rps7
+ribosomal protein S7 GeneID:37626215 = rps7
+rps7 = rps7
+
+# rps8 (30S ribosomal protein S8)
+30S ribosomal protein S8 = rps8
+chloroplast ribosomal protein S8 = rps8
+ribosomal protein S8 = rps8
+rps8 = rps8
+
+# ================================================================================
+# RIBOSOMAL RNA (rrn genes)
+# ================================================================================
+
+# rrn16 (16S ribosomal RNA)
+16S rRNA = rrn16
+16S ribosomal RNA = rrn16
+rRNA16 = rrn16
+ribosomal RNA 16s = rrn16
+rrn16 = rrn16
+rrn16S = rrn16
+rrn16s = rrn16
+
+# rrn23 (23S ribosomal RNA)
+23S rRNA = rrn23
+23S ribosomal RNA = rrn23
+rRNA23 = rrn23
+rn23 = rrn23
+rrn23 = rrn23
+rrn23S = rrn23
+rrn23s = rrn23
+
+# rrn4.5 (4.5S ribosomal RNA)
+4.5 ribosomal RNA = rrn4.5
+4.5S rRNA = rrn4.5
+4.5S ribosomal RNA = rrn4.5
+rRNA4 = rrn4.5
+rRNA4.5 = rrn4.5
+rrn4.5 = rrn4.5
+rrn4.55 = rrn4.5
+rrn4.5S = rrn4.5
+rrn4.5s = rrn4.5
+rrn45 = rrn4.5
+
+# rrn5 (5S ribosomal RNA)
+5S rRNA = rrn5
+5S ribosomal RNA = rrn5
+rRNA5 = rrn5
+rrn5 = rrn5
+rrn5S = rrn5
+rrn5s = rrn5
+
+# ================================================================================
+# tRNA GENES (trn genes - sorted by amino acid)
+# ================================================================================
+
+# trnA-UGC (tRNA-Ala)
+tRNA-Ala = trnA-UGC
+tRNA-Ala (UGC) = trnA-UGC
+tRNA-Ala(UGC) = trnA-UGC
+trnA = trnA-UGC
+trnA (UGC) = trnA-UGC
+trnA(TGC) = trnA-UGC
+trnA(UGC) = trnA-UGC
+trnA-TGC = trnA-UGC
+trnA-UCG = trnA-UGC
+trnA-UGC = trnA-UGC
+trnA-ugc = trnA-UGC
+trnA_UGC = trnA-UGC
+
+# trnC-GCA (tRNA-Cys)
+tRNA-Cys = trnC-GCA
+tRNA-Cys (GCA) = trnC-GCA
+trnC = trnC-GCA
+trnC (GCA) = trnC-GCA
+trnC(GCA) = trnC-GCA
+trnC-ACA = trnC-GCA
+trnC-GCA = trnC-GCA
+trnC_GCA = trnC-GCA
+
+# trnD-GUC (tRNA-Asp)
+tRNA-Asp = trnD-GUC
+tRNA-Asp (GUC) = trnD-GUC
+trnD = trnD-GUC
+trnD (GUC) = trnD-GUC
+trnD(GTC) = trnD-GUC
+trnD(GUC) = trnD-GUC
+trnD-GAC = trnD-GUC
+trnD-GTC = trnD-GUC
+trnD-GUC = trnD-GUC
+trnD_GUC = trnD-GUC
+
+# trnE-UUC (tRNA-Glu)
+tRNA-Glu = trnE-UUC
+tRNA-Glu (UUC) = trnE-UUC
+trnE = trnE-UUC
+trnE (UUC) = trnE-UUC
+trnE(TTC) = trnE-UUC
+trnE(UUC) = trnE-UUC
+trnE-GAA = trnF-GAA
+trnE-GAU = trnI-GAU
+trnE-TTC = trnE-UUC
+trnE-UUC = trnE-UUC
+trnE_UUC = trnE-UUC
+trnI-UUC = trnE-UUC
+
+# trnF-GAA (tRNA-Phe)
+tRNA-Phe = trnF-GAA
+tRNA-Phe (GAA) = trnF-GAA
+trnF = trnF-GAA
+trnF (GAA) = trnF-GAA
+trnF(GAA) = trnF-GAA
+trnF-GAA = trnF-GAA
+trnF_GAA = trnF-GAA
+
+# trnG-GCC (tRNA-Gly)
+tRNA-Gly = trnG-GCC
+tRNA-Gly (GCC) = trnG-GCC
+trnG = trnG-GCC
+trnG (GCC) = trnG-GCC
+trnG(GCC) = trnG-GCC
+trnG-CGA = trnG-GCC
+trnG-GCC = trnG-GCC
+trnG_GCC = trnG-GCC
+trnK-GCC = trnG-GCC
+
+# trnG-UCC (tRNA-Gly)
+tRNA-Gly (UCC) = trnG-UCC
+tRNA-Gly(UUC) = trnE-UUC
+trnG (UCC) = trnG-UCC
+trnG(UCC) = trnG-UCC
+trnG-TCC = trnG-UCC
+trnG-UCC = trnG-UCC
+trnG-UCC_gene = trnG-UCC
+trnG-UCU = trnR-UCU
+trnG_UCC = trnG-UCC
+trnS-UCC = trnG-UCC
+
+# trnH-GUG (tRNA-His)
+tRNA-His = trnH-GUG
+tRNA-His (GUG) = trnH-GUG
+trnH = trnH-GUG
+trnH (GUG) = trnH-GUG
+trnH(CAU) = trnM-CAU
+trnH(GTG) = trnH-GUG
+trnH(GUG) = trnH-GUG
+trnH-CAC = trnH-GUG
+trnH-CAU = trnM-CAU
+trnH-GTG = trnH-GUG
+trnH-GUG = trnH-GUG
+trnH_GUG = trnH-GUG
+
+# trnI-CAU (tRNA-Ile)
+tRNA-Ile = trnI-CAU
+tRNA-Ile (CAU) = trnI-CAU
+trnI = trnI-CAU
+trnI (CAU) = trnI-CAU
+trnI(CAU) = trnI-CAU
+trnI(GAT) = trnI-GAU
+trnI-AUC = trnI-CAU
+trnI-CAT = trnI-CAU
+trnI-CAU = trnI-CAU
+trnI-UAU = trnI-CAU
+trnI_CAU = trnI-CAU
+
+# trnI-GAU (tRNA-Ile)
+tRNA-Ile (GAU) = trnI-GAU
+trnI (GAU) = trnI-GAU
+trnI-GAT = trnI-GAU
+trnI-GAU = trnI-GAU
+trnI_GAU = trnI-GAU
+trnL-GAU = trnI-GAU
+trnl-GAT = trnI-GAU
+
+# trnK-UUU (tRNA-Lys)
+tRNA-Lys = trnK-UUU
+tRNA-Lys (UUU) = trnK-UUU
+trnK = trnK-UUU
+trnK (UUU) = trnK-UUU
+trnK(TTT) = trnK-UUU
+trnK(UUU) = trnK-UUU
+trnK-TTT = trnK-UUU
+trnK-UUU = trnK-UUU
+
+# trnL-CAA (tRNA-Leu)
+tRNA-Leu = trnL-CAA
+tRNA-Leu (CAA) = trnL-CAA
+trnL = trnL-CAA
+trnL (CAA) = trnL-CAA
+trnL(CAA) = trnL-CAA
+trnL-CA = trnL-CAA
+trnL-CAA = trnL-CAA
+trnL-CAA; trnL-UAG = trnL-CAA
+trnL_CAA = trnL-CAA
+
+# trnL-UAA (tRNA-Leu)
+tRNA-Leu (UAA) = trnL-UAA
+trnL (UAA) = trnL-UAA
+trnL(TAA) = trnL-UAA
+trnL(UAA) = trnL-UAA
+trnL-TAA = trnL-UAA
+trnL-UAA = trnL-UAA
+trnL_UAA = trnL-UAA
+
+# trnL-UAG (tRNA-Leu)
+tRNA-Leu (UAG) = trnL-UAG
+trnL (UAG) = trnL-UAG
+trnL(TAG) = trnL-UAG
+trnL(UAG) = trnL-UAG
+trnL-GAG = trnL-UAG
+trnL-TAG = trnL-UAG
+trnL-UAG = trnL-UAG
+trnL-UAG; trnL-CAA = trnL-UAG
+trnL-UUG = trnL-UAG
+trnL_UAG = trnL-UAG
+trnO-CUA = trnL-UAG
+
+# trnM-CAU (tRNA-Met)
+tRNA-Met = trnM-CAU
+tRNA-Met (CAU) = trnM-CAU
+trnM = trnM-CAU
+trnM (CAU) = trnM-CAU
+trnM(CAT) = trnM-CAU
+trnM(CAU) = trnM-CAU
+trnM-AUG = trnM-CAU
+trnM-CAT = trnM-CAU
+trnM-CAU = trnM-CAU
+trnM_CAU = trnM-CAU
+
+# trnN-GUU (tRNA-Asn)
+tRNA-Asn = trnN-GUU
+tRNA-Asn (GUU) = trnN-GUU
+trnN = trnN-GUU
+trnN (GUU) = trnN-GUU
+trnN(GTT) = trnN-GUU
+trnN(GUU) = trnN-GUU
+trnN(GUU); trnN-GUU = trnN-GUU
+trnN-AAC = trnN-GUU
+trnN-GTT = trnN-GUU
+trnN-GUU = trnN-GUU
+trnN_GUU = trnN-GUU
+
+# trnP-UGG (tRNA-Pro)
+tRNA-Pro = trnP-UGG
+tRNA-Pro (UGG) = trnP-UGG
+trnP = trnP-UGG
+trnP (UGG) = trnP-UGG
+trnP(TGG) = trnP-UGG
+trnP(UGG) = trnP-UGG
+trnP-CCA = trnW-CCA
+trnP-GGG = trnP-UGG
+trnP-TGG = trnP-UGG
+trnP-UGG = trnP-UGG
+trnP_UGG = trnP-UGG
+
+# trnQ-UUG (tRNA-Gln)
+tRNA-Gln = trnQ-UUG
+tRNA-Gln (UUG) = trnQ-UUG
+trnQ = trnQ-UUG
+trnQ (UUG) = trnQ-UUG
+trnQ(TTG) = trnQ-UUG
+trnQ(UUG) = trnQ-UUG
+trnQ-TTG = trnQ-UUG
+trnQ-UUG = trnQ-UUG
+trnQ_UUG = trnQ-UUG
+
+# trnR-ACG (tRNA-Arg)
+tRNA-Arg = trnR-ACG
+tRNA-Arg (ACG) = trnR-ACG
+trnR = trnR-ACG
+trnR (ACG) = trnR-ACG
+trnR(ACG) = trnR-ACG
+trnR-ACG = trnR-ACG
+trnR-AGC = trnR-ACG
+trnR-CCG = trnR-ACG
+trnR-CGU = trnR-ACG
+trnR_ACG = trnR-ACG
+
+# trnR-UCU (tRNA-Arg)
+tRNA-Arg (UCU) = trnR-UCU
+trnR (UCU) = trnR-UCU
+trnR(TCT) = trnR-UCU
+trnR(UCU) = trnR-UCU
+trnR-TCT = trnR-UCU
+trnR-UCU = trnR-UCU
+trnR_UCU = trnR-UCU
+
+# trnS-GCU (tRNA-Ser)
+tRNA-Ser = trnS-GCU
+tRNA-Ser (GCU) = trnS-GCU
+trnS = trnS-GCU
+trnS (GCU) = trnS-GCU
+trnS(GCT) = trnS-GCU
+trnS(GCU) = trnS-GCU
+trnS-GCT = trnS-GCU
+trnS-GCU = trnS-GCU
+trnS-GGA; trnS-GCU; trnS-UGA = trnS-GGA
+trnS-GGU = trnS-GCU
+trnS-GUC = trnS-GCU
+trnS-UGA; trnS-GCU; trnS-GGA = trnS-UGA
+trnS_GCU = trnS-GCU
+
+# trnS-GGA (tRNA-Ser)
+tRNA-Ser (GGA) = trnS-GGA
+trnS (GGA) = trnS-GGA
+trnS(GGA) = trnS-GGA
+trnS-AGA = trnS-GGA
+trnS-CGA = trnS-GGA
+trnS-GGA = trnS-GGA
+trnS_GGA = trnS-GGA
+
+# trnS-UGA (tRNA-Ser)
+tRNA-Ser (UGA) = trnS-UGA
+trnS (UGA) = trnS-UGA
+trnS(TGA) = trnS-UGA
+trnS(UGA) = trnS-UGA
+trnS-TGA = trnS-UGA
+trnS-UGA = trnS-UGA
+trnS_UGA = trnS-UGA
+
+# trnT-GGU (tRNA-Thr)
+tRNA-Thr = trnT-GGU
+tRNA-Thr (GGU) = trnT-GGU
+trnT = trnT-GGU
+trnT (GGU) = trnT-GGU
+trnT(GGT) = trnT-GGU
+trnT(GGU) = trnT-GGU
+trnT(GGU); trnT-UGU; trnM(CAU) = trnT-GGU
+trnT-ACA = trnT-GGU
+trnT-ACC = trnT-GGU
+trnT-CGU = trnT-GGU
+trnT-GGT = trnT-GGU
+trnT-GGU = trnT-GGU
+trnT-GGU; trnT-UGU = trnT-GGU
+trnT_GGU = trnT-GGU
+
+# trnT-UGU (tRNA-Thr)
+tRNA-Thr (UGU) = trnT-UGU
+trnT (UGU) = trnT-UGU
+trnT(TGT) = trnT-UGU
+trnT(UGU) = trnT-UGU
+trnT-TGT = trnT-UGU
+trnT-UGU = trnT-UGU
+trnT-UGU; trnT(GGU) = trnT-UGU
+trnT_UGU = trnT-UGU
+
+# trnV-GAC (tRNA-Val)
+tRNA-Val = trnV-GAC
+tRNA-Val (GAC) = trnV-GAC
+trnV = trnV-GAC
+trnV (GAC) = trnV-GAC
+trnV(GAC) = trnV-GAC
+trnV(GAC); trnV-GAC = trnV-GAC
+trnV-GAC = trnV-GAC
+trnV_GAC = trnV-GAC
+
+# trnV-UAC (tRNA-Val)
+tRNA-Val (UAC) = trnV-UAC
+trnV (UAC) = trnV-UAC
+trnV(UAC) = trnV-UAC
+trnV-TAC = trnV-UAC
+trnV-UAC = trnV-UAC
+trnV-UCA = trnV-UAC
+trnV_UAC = trnV-UAC
+
+# trnW-CCA (tRNA-Trp)
+tRNA-Trp = trnW-CCA
+tRNA-Trp (CCA) = trnW-CCA
+trnW = trnW-CCA
+trnW (CCA) = trnW-CCA
+trnW(CCA) = trnW-CCA
+trnW-CCA = trnW-CCA
+trnW_CCA = trnW-CCA
+
+# trnY-GUA (tRNA-Tyr)
+tRNA-Tyr = trnY-GUA
+tRNA-Tyr (GUA) = trnY-GUA
+trnY = trnY-GUA
+trnY (GUA) = trnY-GUA
+trnY(GTA) = trnY-GUA
+trnY(GUA) = trnY-GUA
+trnY-GTA = trnY-GUA
+trnY-GUA = trnY-GUA
+trnY-UAC = trnY-GUA
+trnY_GUA = trnY-GUA
+
+# trnfM-CAU (tRNA-fMet)
+tRNA-fMet = trnfM-CAU
+tRNA-fMet (CAT) = trnfM-CAU
+tRNA-fMet (CAU) = trnfM-CAU
+trnfM = trnfM-CAU
+trnfM (CAU) = trnfM-CAU
+trnfM(CAU) = trnfM-CAU
+trnfM-CAT = trnfM-CAU
+trnfM-CAU = trnfM-CAU
+trnfM-CAU; trnP-UGG = trnfM-CAU
+trnfM_CAU = trnfM-CAU
+
+# ================================================================================
+# HYPOTHETICAL CHLOROPLAST READING FRAMES (ycf genes)
+# ================================================================================
+
+# ycf1 (hypothetical chloroplast reading frame 1)
+Ycf1 = ycf1
+Ycf1 protein = ycf1
+hypothetical chloroplast protein ycf1 = ycf1
+hypothetical protein Ycf1 = ycf1
+photosystem I assembly protein Ycf1 = ycf1
+photosystem I assembly protein ycf1 = ycf1
+yc15 = ycf1
+ycf1 = ycf1
+ycf1 (fragment) = ycf1
+ycf1 protein = ycf1
+ycf10 = ycf10
+Ycf10 = ycf10
+Ycf10 protein = ycf10
+ycf15 = ycf15
+Ycf15 = ycf15
+Ycf15 protein = ycf15
+conserved hypothetical protein Ycf15 = ycf15
+hypothetical protein Ycf15 = ycf15
+
+# ycf2 (hypothetical chloroplast reading frame 2)
+Ycf2 = ycf2
+Ycf2 protein = ycf2
+hypothetical chloroplast protein ycf2 = ycf2
+hypothetical protein Ycf2 = ycf2
+photosystem I assembly protein Ycf2 = ycf2
+ycf2 = ycf2
+
+# ycf3 (photosystem I assembly protein)
+Ycf3 = ycf3
+Ycf3 protein = ycf3
+photosystem I assembly protein Ycf3 = ycf3
+photosystem I assembly protein ycf3 = ycf3
+putative protein Ycf3 = ycf3
+ycf3 = ycf3
+
+# ycf4 (photosystem I assembly protein)
+Ycf4 = ycf4
+Ycf4 protein = ycf4
+photosystem I assembly protein Ycf4 = ycf4
+photosystem I assembly protein ycf4 = ycf4
+ycf4 = ycf4
+
+# ycf5 (hypothetical chloroplast reading frame 5)
+ycf5 = ycf5
+
+# ycf6 (hypothetical chloroplast reading frame 6)
+ycf6 = ycf6
+
+# ycf68 (hypothetical chloroplast reading frame 68)
+Ycf68 = ycf68
+hypothetical protein Ycf68 = ycf68
+ycf68 = ycf68
+
+# ycf9 (hypothetical chloroplast reading frame 9)
+ycf9 = ycf9
+
+# ================================================================================
+# OTHER GENES AND UNCERTAIN MAPPINGS
+# ================================================================================
+
+# cemA variants that might belong elsewhere
+ycf10/cemA = cemA
+
+# Genes that are likely viral contamination or misannotations
+# (commented out - not included in active mappings)
+# EFP, EGT, FGF-1, FGF-2, FGF-3, FP, IAP-3, IAP-5, IE-1
+# LEF-1 through LEF-11, LhbA, MP-NASE, ODV-E18, ODV-E25, etc.
+# PIF-1, PIF-2, PK-1, VP39 capsid, VP91 capsid, VLF-1
+# p10, p13, p24, p33, p47, p48, p49, p6.9, p74
+# ubq, vlf-1, vp1054, sod, sprA
+
+# Genes with uncertain mappings that need more research
+# DBP, DNA ligase, DNA polymerase, desmoplakin, granulin
+# helicase-1, helicase-2, gp41, initial transcription factor
+# beta-galactosidase fusion protein, chlB, etc.

@@ -1,0 +1,19 @@
+"${PREFIX}/bin/julia" --project=${PREFIX}/bin/chloe -e 'using Pkg; Pkg.add("ArgParse")' >> "${PREFIX}/.messages.txt" 2>&1
+"${PREFIX}/bin/julia" --project=${PREFIX}/bin/chloe -e 'using Pkg; Pkg.add("ArtifactUtils")' >> "${PREFIX}/.messages.txt" 2>&1
+"${PREFIX}/bin/julia" --project=${PREFIX}/bin/chloe -e 'using Pkg; Pkg.add("BioSequences")' >> "${PREFIX}/.messages.txt" 2>&1
+"${PREFIX}/bin/julia" --project=${PREFIX}/bin/chloe -e 'using Pkg; Pkg.add("CSV")' >> "${PREFIX}/.messages.txt" 2>&1
+"${PREFIX}/bin/julia" --project=${PREFIX}/bin/chloe -e 'using Pkg; Pkg.add("CodecZlib")' >> "${PREFIX}/.messages.txt" 2>&1
+"${PREFIX}/bin/julia" --project=${PREFIX}/bin/chloe -e 'using Pkg; Pkg.add("Crayons")' >> "${PREFIX}/.messages.txt" 2>&1
+"${PREFIX}/bin/julia" --project=${PREFIX}/bin/chloe -e 'using Pkg; Pkg.add("DataFrames")' >> "${PREFIX}/.messages.txt" 2>&1
+"${PREFIX}/bin/julia" --project=${PREFIX}/bin/chloe -e 'using Pkg; Pkg.add("Dates")' >> "${PREFIX}/.messages.txt" 2>&1
+"${PREFIX}/bin/julia" --project=${PREFIX}/bin/chloe -e 'using Pkg; Pkg.add("FASTX")' >> "${PREFIX}/.messages.txt" 2>&1
+"${PREFIX}/bin/julia" --project=${PREFIX}/bin/chloe -e 'using Pkg; Pkg.add("GenomicAnnotations")' >> "${PREFIX}/.messages.txt" 2>&1
+"${PREFIX}/bin/julia" --project=${PREFIX}/bin/chloe -e 'using Pkg; Pkg.add("IntervalTrees")' >> "${PREFIX}/.messages.txt" 2>&1
+"${PREFIX}/bin/julia" --project=${PREFIX}/bin/chloe -e 'using Pkg; Pkg.add("Logging")' >> "${PREFIX}/.messages.txt" 2>&1
+"${PREFIX}/bin/julia" --project=${PREFIX}/bin/chloe -e 'using Pkg; Pkg.add("Printf")' >> "${PREFIX}/.messages.txt" 2>&1
+"${PREFIX}/bin/julia" --project=${PREFIX}/bin/chloe -e 'using Pkg; Pkg.add("Statistics")' >> "${PREFIX}/.messages.txt" 2>&1
+"${PREFIX}/bin/julia" --project=${PREFIX}/bin/chloe -e 'using Pkg; Pkg.add("StatsBase")' >> "${PREFIX}/.messages.txt" 2>&1
+"${PREFIX}/bin/julia" --project=${PREFIX}/bin/chloe -e 'using Pkg; Pkg.add("UUIDs")' >> "${PREFIX}/.messages.txt" 2>&1
+"${PREFIX}/bin/julia" --project=${PREFIX}/bin/chloe -e 'using Pkg; Pkg.add("XGBoost")' >> "${PREFIX}/.messages.txt" 2>&1
+
+"${PREFIX}/bin/julia" --project=${PREFIX}/bin/chloe -e 'using Pkg; Pkg.instantiate()' >> "${PREFIX}/.messages.txt" 2>&1

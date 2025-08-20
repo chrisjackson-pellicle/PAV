@@ -1,0 +1,23 @@
+# Core scientific computing and bioinformatics
+biopython>=1.81
+pandas>=1.5.0
+
+# Progress bars and user interface
+tqdm>=4.64.0
+
+# Standard library dependencies (included with Python 3.7+)
+# - os, sys, collections, traceback, concurrent.futures
+# - subprocess, tempfile, glob, re, shutil, uuid
+# - io, importlib.resources, time, threading
+# - multiprocessing, logging, datetime, pstats
+# - argparse, textwrap, cProfile, pathlib
+# - gzip, copy, json, shlex
+
+# External system dependencies (not Python packages, need to be installed separately):
+# - julia (for chloe annotation)
+# - mafft (for sequence alignment)
+# - trimal (for backtranslation of protein alignments)
+# - blast+ (for sequence similarity search)
+
+# Development dependencies (optional)
+# - setuptools (for package installation)
