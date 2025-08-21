@@ -66,6 +66,39 @@ def annotate_and_check_parser(subparsers):
                                 help='Custom folder containing reference GenBank files. Can be used in addition to --refs_order or default references.')
 
     ####################################################################################################################
+    intergenic_group = parser_annotate_and_check.add_argument_group('Intergenic region analysis')
+    
+    intergenic_group.add_argument('--min_intergenic_length', '-min_ig_len',
+                                 type=int,
+                                 default=0,
+                                 metavar='INTEGER',
+                                 help='Minimum length of intergenic region to analyze. Default is: %(default)s')
+    
+    intergenic_group.add_argument('--blast_evalue', '-evalue',
+                                 type=float,
+                                 default=1e-10,
+                                 metavar='FLOAT',
+                                 help='BLAST E-value threshold for intergenic region analysis. Default is: %(default)s')
+    
+    intergenic_group.add_argument('--skip_intergenic_analysis', '-skip_ig',
+                                 action='store_true',
+                                 default=False,
+                                 help='Skip intergenic region analysis. Default is: %(default)s')
+    
+    intergenic_group.add_argument('--debug_intergenic', '-debug_ig',
+                                 action='store_true',
+                                 default=False,
+                                 help='Write intergenic regions to FASTA files for debugging. Default is: %(default)s')
+    
+    intergenic_group.add_argument('--max_blast_hits', '-max_hits',
+                                 type=int,
+                                 default=1,
+                                 metavar='INTEGER',
+                                 help='Maximum number of BLAST hits to retain per intergenic region. Default is: %(default)s')
+
+    ####################################################################################################################
+
+    ####################################################################################################################
     optional_group_general = parser_annotate_and_check.add_argument_group('General pipeline options')
     optional_group_general.add_argument('--output_directory', '-out_dir',
                                 type=str,
@@ -103,39 +136,6 @@ def annotate_and_check_parser(subparsers):
                               default=False,
                               help='If supplied, run the subcommand using cProfile. Saves a *.csv file of results. '
                                    'Default is: %(default)s')
-
-    ####################################################################################################################
-    intergenic_group = parser_annotate_and_check.add_argument_group('Intergenic region analysis')
-    
-    intergenic_group.add_argument('--min_intergenic_length', '-min_ig_len',
-                                 type=int,
-                                 default=0,
-                                 metavar='INTEGER',
-                                 help='Minimum length of intergenic region to analyze. Default is: %(default)s')
-    
-    intergenic_group.add_argument('--blast_evalue', '-evalue',
-                                 type=float,
-                                 default=1e-10,
-                                 metavar='FLOAT',
-                                 help='BLAST E-value threshold for intergenic region analysis. Default is: %(default)s')
-    
-    intergenic_group.add_argument('--skip_intergenic_analysis', '-skip_ig',
-                                 action='store_true',
-                                 default=False,
-                                 help='Skip intergenic region analysis. Default is: %(default)s')
-    
-    intergenic_group.add_argument('--debug_intergenic', '-debug_ig',
-                                 action='store_true',
-                                 default=False,
-                                 help='Write intergenic regions to FASTA files for debugging. Default is: %(default)s')
-    
-    intergenic_group.add_argument('--max_blast_hits', '-max_hits',
-                                 type=int,
-                                 default=1,
-                                 metavar='INTEGER',
-                                 help='Maximum number of BLAST hits to retain per intergenic region. Default is: %(default)s')
-
-    ####################################################################################################################
 
 
     return parser_annotate_and_check

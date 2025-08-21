@@ -80,25 +80,90 @@ pav annotate_and_check \
 
 ### Command Line Options
 
-#### Required Positional Arguments
-- `genome_fasta_dir`: Directory containing input FASTA files
-- `metadata_tsv`: TSV file containing sample metadata
+```
+usage: pav annotate_and_check [-h] [--min_length_percentage FLOAT]
+                              [--max_length_percentage FLOAT] [--no_alignment]
+                              [--refs_order REFS_ORDER [REFS_ORDER ...]]
+                              [--custom_refs_folder CUSTOM_REFS_FOLDER]
+                              [--min_intergenic_length INTEGER]
+                              [--blast_evalue FLOAT]
+                              [--skip_intergenic_analysis]
+                              [--debug_intergenic] [--max_blast_hits INTEGER]
+                              [--output_directory output_directory]
+                              [--pool INTEGER] [--threads INTEGER]
+                              [--chloe_project_dir PATH] [--chloe_script PATH]
+                              [--linearize_gene GENE_NAME] [--run_profiler]
+                              DIR TSV
 
-#### Optional Arguments
-- `--output_directory`: Directory for output files (default: output_directory)
-- `--refs_order`: Reference order(s) to use for validation (can specify multiple)
-- `--custom_refs_folder`: Custom folder containing reference GenBank files (can be used in addition to --refs_order or default references)
-- `--no_alignment`: Skip alignment generation
-- `--min_length_percentage`: Minimum gene length percentage (default: 0.8)
-- `--max_length_percentage`: Maximum gene length percentage (default: 1.2)
-- `--pool`: Number of processes for multiprocessing (default: 1)
-- `--threads`: Number of threads per process (default: 1)
-- `--linearise_gene`: Gene to use for genome linearisation (default: psbA)
-- `--skip_intergenic_analysis`: Skip intergenic BLAST analysis
-- `--min_intergenic_length`: Minimum intergenic length to analyze (default: 0)
-- `--blast_evalue`: BLAST E-value threshold (default: 1e-10)
-- `--max_blast_hits`: Max BLAST hits to retain per region (default: 1)
-- `--debug_intergenic`: Write intergenic regions to FASTA for debugging
+options:
+  -h, --help            show this help message and exit
+
+Required input:
+  DIR                   Directory containing plastid DNA FASTA files.
+  TSV                   TSV file containing sample metadata for EMBL
+                        conversion. Required file should contain columns:
+                        fasta_filename, project_id, locus_tag, genus_species,
+                        linear_or_circular. ALL samples must be listed. Only
+                        fasta_filename and linear_or_circular require values;
+                        empty optional fields will use defaults.
+                        linear_or_circular must be "linear" or "circular".
+
+Gene length warnings:
+  --min_length_percentage FLOAT, -min_len FLOAT
+                        Minimum length percentage of the gene median length
+                        for a warning to be issued. Default is: 0.8
+  --max_length_percentage FLOAT, -max_len FLOAT
+                        Maximum length percentage of the gene median length
+                        for a warning to be issued. Default is: 1.2
+
+Alignment with reference genes:
+  --no_alignment, -no_align
+                        Do not align annotated genes with reference genes.
+                        Default is: False
+  --refs_order REFS_ORDER [REFS_ORDER ...], -refs_ord REFS_ORDER [REFS_ORDER ...]
+                        Order(s) to use for reference genes. Can be specified
+                        multiple times. Default is: []
+  --custom_refs_folder CUSTOM_REFS_FOLDER, -custom_refs CUSTOM_REFS_FOLDER
+                        Custom folder containing reference GenBank files. Can
+                        be used in addition to --refs_order or default
+                        references.
+
+Intergenic region analysis:
+  --min_intergenic_length INTEGER, -min_ig_len INTEGER
+                        Minimum length of intergenic region to analyze.
+                        Default is: 0
+  --blast_evalue FLOAT, -evalue FLOAT
+                        BLAST E-value threshold for intergenic region
+                        analysis. Default is: 1e-10
+  --skip_intergenic_analysis, -skip_ig
+                        Skip intergenic region analysis. Default is: False
+  --debug_intergenic, -debug_ig
+                        Write intergenic regions to FASTA files for debugging.
+                        Default is: False
+  --max_blast_hits INTEGER, -max_hits INTEGER
+                        Maximum number of BLAST hits to retain per intergenic
+                        region. Default is: 1
+
+General pipeline options:
+  --output_directory output_directory, -out_dir output_directory
+                        Output directory for the subcommand. Default is:
+                        output_directory
+  --pool INTEGER        The number of CPUs to use for the subcommand. Default
+                        is: 1
+  --threads INTEGER     The number of threads to use for the subcommand.
+                        Default is: 1
+  --chloe_project_dir PATH, -chloe_proj PATH
+                        Path to the chloe project directory to use as
+                        --project for Julia. Must be provided together with
+                        --chloe_script.
+  --chloe_script PATH, -chloe_jl PATH
+                        Path to the chloe.jl script. Must be provided together
+                        with --chloe_project_dir.
+  --linearize_gene GENE_NAME, -linearize_gene GENE_NAME
+                        Gene to use for genome linearization. Default is: psbA
+  --run_profiler        If supplied, run the subcommand using cProfile. Saves
+                        a *.csv file of results. Default is: False
+```
 
 ### Example Commands
 
@@ -147,7 +212,7 @@ pav annotate_and_check \
 pav annotate_and_check \
   genomes/ \
   metadata.tsv \
-  --linearise_gene rbcL
+  --linearize_gene rbcL
 ```
 
 #### Custom parameters:
@@ -179,10 +244,10 @@ output_dir/
 │   └── sample_name/
 │       ├── <prefix>.chloe.original.gbk          # Original annotation (preserved)
 │       ├── <prefix>.chloe.original.gff          # Original GFF (preserved)
-│       ├── <prefix>_linearised.chloe.gbk        # Re-annotated after linearisation
-│       ├── <prefix>_linearised.chloe.gff        # Re-annotated after linearisation
-│       └── <prefix>_linearised.fasta            # Linearised sequence
-│       └── <prefix>_linearised.chloe_intergenic_debug.fasta   # Optional (when --debug_intergenic)
+│       ├── <prefix>_linearized.chloe.gbk        # Re-annotated after linearization
+│       ├── <prefix>_linearized.chloe.gff        # Re-annotated after linearization
+│       └── <prefix>_linearized.fasta            # Linearized sequence
+│       └── <prefix>_linearized.chloe_intergenic_debug.fasta   # Optional (when --debug_intergenic)
 ├── 02_embl_files/
 │   ├── <sample_name>.embl                        # EMBL format
 │   └── <sample_name>.ena.embl                    # ENA template (derived from EMBL)
@@ -205,8 +270,8 @@ output_dir/
 ### 1. Genome Annotation
 - Processes input FASTA files using Chloë
 - Performs initial annotation on original sequences
-- Linearises genomes upstream of a specified gene (default: psbA), unless sample is recorded as `linear` in metadata
-- Re-annotates linearised sequences
+- Linearizes genomes upstream of a specified gene (default: psbA), unless sample is recorded as `linear` in metadata
+- Re-annotates linearized sequences
 
 ### 2. Reference Validation
 - Loads reference sequences from multiple sources (CDS, rRNA, and tRNA)
@@ -254,7 +319,7 @@ Notes:
   - `genus_species` → `'Unknown species'`
 - The topology is used in the ENA `ID` line and must match one of: `linear`, `circular`
 - **ALL samples must be present in the metadata file** - PAV will fail if any samples are missing
-- Samples marked as `linear` will **not be re-linearised** at the `--linearise_gene` position, preserving their original linear structure
+- Samples marked as `linear` will **not be re-linearized** at the `--linearize_gene` position, preserving their original linear structure
 
 ## Gene Types Supported
 
@@ -279,7 +344,7 @@ Reference sequences are named using the format: `{Order}_{Family}_{Genus}_{Speci
 - **GenBank**: Annotated genomes in GenBank format
 - **GFF**: Gene feature format files
 - **EMBL**: European Molecular Biology Laboratory format
-- **FASTA**: Aligned sequences and linearised genomes
+- **FASTA**: Aligned sequences and linearized genomes
 
 ## Reference Data
 
