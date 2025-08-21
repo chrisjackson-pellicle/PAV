@@ -1,11 +1,10 @@
-```
             ██████╗      █████╗     ██╗   ██╗
             ██╔══██╗    ██╔══██╗    ██║   ██║
             ██████╔╝    ███████║    ██║   ██║
             ██╔═══╝     ██╔══██║    ╚██╗ ██╔╝
             ██║         ██║  ██║     ╚████╔╝ 
             ╚═╝         ╚═╝  ╚═╝      ╚═══╝  
-```
+
 
 # Plastid Annotation Validator (PAV)
 
@@ -243,7 +242,7 @@ Example (`metadata.tsv`):
 |----------------|------------|-----------|---------------|--------------------|
 | sample1.fasta  | PRJEB12345 | ABC       | Arabidopsis thaliana | circular |
 | sample2.fasta  | PRJEB98765 | XYZ       | Oryza sativa | linear |
-up| sample3.fasta  |            |           |               | circular |
+| sample3.fasta  |            |           |               | circular |
 
 
 Notes:
