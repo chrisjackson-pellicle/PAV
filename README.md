@@ -197,12 +197,6 @@ output_dir/
 - Linearizes genomes upstream of a specified gene (default: psbA)
 - Re-annotates linearized sequences
 
-**Linearization Process:**
-- The tool identifies the specified gene in the annotated genome
-- Linearizes the circular genome by cutting upstream of the gene start position
-- Creates a new FASTA file with the linearized sequence
-- Re-annotates the linearized sequence to ensure proper feature coordinates
-
 ### 2. Reference Validation
 - Loads reference sequences from multiple sources (CDS, rRNA, and tRNA)
 - Validates gene annotations against reference data
@@ -211,11 +205,11 @@ output_dir/
 
 ### 3. Alignment Generation
 - Creates nucleotide alignments with reference sequences for rRNA and tRNA genes
-- Generates protein alignments with backtranslated nucleotide alignments for CDS genes
+- Generates codon-aware nucleotide alignments for CDS genes
 
 ### 4. EMBL and ENA Template Generation
 - Adds locus tags and standardizes features for EMBL
-- Builds EMBL template using metadata TSV (see below), ready for submission to ENA
+- Builds EMBL templates using metadata TSV (see below), ready for submission to ENA
 
 ### 6. Intergenic Region Analysis
 - Extracts intergenic regions from annotated genomes
@@ -224,7 +218,7 @@ output_dir/
 
 ## Metadata TSV Format
 
-Provide a tab-separated file with the following required columns:
+Provide a tab-separated file with the following required columns (include this header in the file):
 
 - `fasta_filename`
 - `project_id`
@@ -234,11 +228,11 @@ Provide a tab-separated file with the following required columns:
 
 Example (`metadata.tsv`):
 
-```
-fasta_filename	project_id	locus_tag	genus_species	linear_or_circular
-sample1.fasta	PRJEB12345	ABC	Arabidopsis thaliana	circular
-sample2.fasta	PRJEB98765	XYZ	Oryza sativa	linear
-```
+| fasta_filename | project_id | locus_tag | genus_species | linear_or_circular |
+|----------------|------------|-----------|---------------|--------------------|
+| sample1.fasta  | PRJEB12345 | ABC       | Arabidopsis thaliana | circular |
+| sample2.fasta  | PRJEB98765 | XYZ       | Oryza sativa | linear |
+
 
 Notes:
 - Only the columns above are required; defaults are used for anything else
