@@ -863,6 +863,8 @@ def check_no_alignment_and_refs_order(args, gene_median_lengths, gene_synonyms=N
     
     if sources_used:
         logger.info(f"{"[INFO]:":10} Combined reference sequences from: {', '.join(sources_used)}")
+
+    utils.log_separator(logger)
     
     return merged_refs
 
@@ -2083,19 +2085,19 @@ def align_genes(all_sample_results, ref_gene_seqrecords, output_directory, pool_
     utils.log_separator(logger)
 
 
-def linearize_genome_upstream_gene(gbk_file, fasta_file, output_dir, sample_name, linearize_gene='psbA'):
+def linearise_genome_upstream_gene(gbk_file, fasta_file, output_dir, sample_name, linearise_gene='psbA'):
     """
-    Linearize genome upstream of specified gene and write new fasta file.
+    Linearise genome upstream of specified gene and write new fasta file.
     
     Args:
         gbk_file (str): Path to annotated GenBank file
         fasta_file (str): Path to original fasta file
-        output_dir (str): Output directory for linearized fasta
+        output_dir (str): Output directory for linearised fasta
         sample_name (str): Sample name for output file
-        linearize_gene (str): Gene name to use for linearization (default: 'psbA')
+        linearise_gene (str): Gene name to use for linearisation (default: 'psbA')
         
     Returns:
-        str: Path to the new linearized fasta file
+        str: Path to the new linearised fasta file
     """
     try:
         # Read the annotated GenBank file
@@ -2106,50 +2108,55 @@ def linearize_genome_upstream_gene(gbk_file, fasta_file, output_dir, sample_name
         gene_start = None
         for feature in record.features:
             if feature.type == 'CDS' and 'gene' in feature.qualifiers:
-                if feature.qualifiers['gene'][0] == linearize_gene:
+                if feature.qualifiers['gene'][0] == linearise_gene:
                     gene_start = feature.location.start
                     break
         
         if gene_start is None:
-            logger.warning(f"{"[WARNING]:":10} {linearize_gene} gene not found in {sample_name}, using original sequence")
+            logger.warning(f"{"[WARNING]:":10} {linearise_gene} gene not found in {sample_name}, using original sequence")
             return fasta_file
         
         # Read original fasta sequence
         with open(fasta_file, 'r') as handle:
             fasta_record = next(SeqIO.parse(handle, 'fasta'))
         
-        # Linearize upstream of the specified gene
+        # Linearise upstream of the specified gene
         sequence = fasta_record.seq
-        linearized_sequence = sequence[gene_start:] + sequence[:gene_start]
+        linearised_sequence = sequence[gene_start:] + sequence[:gene_start]
         
         # Create new fasta record
-        linearized_record = SeqRecord(
-            seq=linearized_sequence,
+        linearised_record = SeqRecord(
+            seq=linearised_sequence,
             id=fasta_record.id,
-            description=f"Linearized upstream of {linearize_gene} (original position: {gene_start})"
+            description=f"Linearised upstream of {linearise_gene} (original position: {gene_start})"
         )
         
-        # Write linearized fasta file
-        linearized_fasta = os.path.join(output_dir, f"{sample_name}_linearized.fasta")
-        with open(linearized_fasta, 'w') as handle:
-            SeqIO.write(linearized_record, handle, 'fasta')
+        # Write linearised fasta file
+        linearised_fasta = os.path.join(output_dir, f"{sample_name}_linearised.fasta")
+        with open(linearised_fasta, 'w') as handle:
+            SeqIO.write(linearised_record, handle, 'fasta')
         
-        logger.debug(f"{"[INFO]:":10} Linearized {sample_name} upstream of {linearize_gene} (position {gene_start})")
-        return linearized_fasta
+        logger.debug(f"{"[INFO]:":10} Linearised {sample_name} upstream of {linearise_gene} (position {gene_start})")
+        return linearised_fasta
         
     except Exception as e:
-        logger.error(f"{"[ERROR]:":10} Failed to linearize {sample_name}: {str(e)}")
+        logger.error(f"{"[ERROR]:":10} Failed to linearise {sample_name}: {str(e)}")
         return fasta_file
 
 
-def annotate_genomes(genome_fasta_dir, output_directory, chloe_project_dir=None, chloe_script_path=None, linearize_gene='psbA'):
+def annotate_genomes(genome_fasta_dir, output_directory, chloe_project_dir=None, chloe_script_path=None, linearise_gene='psbA', metadata_dict=None):
     """
     Annotate genome fasta files using chloe annotate command.
     
     Args:
         genome_fasta_dir (str): Path to directory containing genome fasta files
         output_directory (str): Path to directory to write annotated genomes
-        logger: Logger instance for logging messages
+        chloe_project_dir (str, optional): Path to the chloe project directory
+        chloe_script_path (str, optional): Path to the chloe.jl script
+        linearise_gene (str, optional): Gene to use for linearisation (default: 'psbA')
+        metadata_dict (dict, optional): Metadata dictionary mapping fasta filenames to metadata.
+                                      Used to check linear_or_circular status to skip linearisation
+                                      for samples already marked as linear.
         
     Returns:
         dict: Dictionary mapping sample names to their annotation file paths
@@ -2177,7 +2184,7 @@ def annotate_genomes(genome_fasta_dir, output_directory, chloe_project_dir=None,
         utils.exit_program()
     
     # Print fasta files to annotate
-    utils.log_separator(logger)
+    # utils.log_separator(logger)
     logger.info(f"{"[INFO]:":10} Found {len(fasta_files)} fasta files to annotate:")
     for fasta_file in fasta_files:
         logger.info(f"{" ":10} {os.path.basename(fasta_file)}")
@@ -2192,7 +2199,7 @@ def annotate_genomes(genome_fasta_dir, output_directory, chloe_project_dir=None,
         # Get the basename and filename prefix
         basename = os.path.basename(fasta_file)
         filename_prefix = os.path.splitext(basename)[0]
-        
+
         # Remove additional extensions if present (e.g., .fasta.gz -> .fasta)
         if filename_prefix.endswith('.fasta'):
             filename_prefix = filename_prefix[:-6]  # Remove .fasta
@@ -2205,6 +2212,9 @@ def annotate_genomes(genome_fasta_dir, output_directory, chloe_project_dir=None,
 
         # Initialise dict for sample data
         annotated_genomes[filename_prefix_no_dots] = {}
+
+        # Add the orginal fasta file to the annotated_genomes dict for later metadata checking
+        annotated_genomes[filename_prefix_no_dots]['original_fasta'] = basename
         
         # Define output gbk file path
         output_sample_dir = os.path.join(annotated_genomes_dir, filename_prefix_no_dots)
@@ -2215,9 +2225,9 @@ def annotate_genomes(genome_fasta_dir, output_directory, chloe_project_dir=None,
         output_sample_gff = os.path.join(output_sample_dir, f"{filename_prefix}.chloe.gff")
         output_sample_gbk_original = os.path.join(output_sample_dir, f"{filename_prefix}.chloe.original.gbk")
         output_sample_gff_original = os.path.join(output_sample_dir, f"{filename_prefix}.chloe.original.gff")
-        output_sample_gbk_linearized = os.path.join(output_sample_dir, f"{filename_prefix}_linearized.chloe.gbk")
-        output_sample_gff_linearized = os.path.join(output_sample_dir, f"{filename_prefix}_linearized.chloe.gff")
-        output_sample_fasta_linearized = os.path.join(output_sample_dir, f"{filename_prefix}_linearized.fasta")
+        output_sample_gbk_linearised = os.path.join(output_sample_dir, f"{filename_prefix}_linearised.chloe.gbk")
+        output_sample_gff_linearised = os.path.join(output_sample_dir, f"{filename_prefix}_linearised.chloe.gff")
+        output_sample_fasta_linearised = os.path.join(output_sample_dir, f"{filename_prefix}_linearised.fasta")
 
         # Remove any existing non-renamed files
         if os.path.exists(output_sample_gbk):
@@ -2229,12 +2239,12 @@ def annotate_genomes(genome_fasta_dir, output_directory, chloe_project_dir=None,
 
         # Determine what needs to be done
         has_original_annotation = utils.file_exists_and_not_empty(output_sample_gbk_original) and utils.file_exists_and_not_empty(output_sample_gff_original)
-        has_linearized_annotation_and_fasta = utils.file_exists_and_not_empty(output_sample_gbk_linearized) and utils.file_exists_and_not_empty(output_sample_gff_linearized) and utils.file_exists_and_not_empty(output_sample_fasta_linearized)
+        has_linearised_annotation_and_fasta = utils.file_exists_and_not_empty(output_sample_gbk_linearised) and utils.file_exists_and_not_empty(output_sample_gff_linearised) and utils.file_exists_and_not_empty(output_sample_fasta_linearised)
         
-        if has_linearized_annotation_and_fasta:
-            logger.debug(f"{"[INFO]:":10} {filename_prefix} already completely processed with linearized sequence")
+        if has_linearised_annotation_and_fasta:
+            logger.debug(f"{"[INFO]:":10} {filename_prefix} already completely processed with linearised sequence")
         elif has_original_annotation:
-            logger.debug(f"{"[INFO]:":10} {filename_prefix} needs linearization and re-annotation")
+            logger.debug(f"{"[INFO]:":10} {filename_prefix} needs linearisation and re-annotation")
         else:
             logger.debug(f"{"[INFO]:":10} {filename_prefix} needs initial annotation")
 
@@ -2295,26 +2305,37 @@ def annotate_genomes(genome_fasta_dir, output_directory, chloe_project_dir=None,
 
             has_original_annotation = True
 
-        # Linearize and re-annotate (if we have original annotation but no linearized)
-        if has_original_annotation and not has_linearized_annotation_and_fasta:
-            logger.debug(f"{"[INFO]:":10} Linearizing {filename_prefix} upstream of {linearize_gene}...")
+        # Check metadata to determine if linearisation should be skipped
+        should_linearise = True
+        if metadata_dict:
+            # Get fasta filename for metadata lookup (same logic as in convert_gbk_to_embl)
+            fasta_filename = basename
+            if fasta_filename in metadata_dict:
+                topology = metadata_dict[fasta_filename].get('linear_or_circular', 'circular')
+                if topology == 'linear':
+                    should_linearise = False
+                    logger.debug(f"{"[INFO]:":10} Skipping linearisation for {filename_prefix} - already marked as linear in metadata")
+
+        # Linearise and re-annotate (if we have original annotation but no linearised and sample should be linearised)
+        if has_original_annotation and not has_linearised_annotation_and_fasta and should_linearise:
+            logger.debug(f"{"[INFO]:":10} Linearising {filename_prefix} upstream of {linearise_gene}...")
             
-            # Linearize the genome upstream of the specified gene
-            output_sample_fasta_linearized = linearize_genome_upstream_gene(
+            # Linearise the genome upstream of the specified gene
+            output_sample_fasta_linearised = linearise_genome_upstream_gene(
                 output_sample_gbk_original, 
                 fasta_file, 
                 output_sample_dir, 
                 filename_prefix_no_dots,
-                linearize_gene
+                linearise_gene
             )
 
-            if output_sample_fasta_linearized != fasta_file:
-                # Re-annotate with linearized sequence
+            if output_sample_fasta_linearised != fasta_file:
+                # Re-annotate with linearised sequence
 
-                # Re-run chloe with linearized fasta
-                cmd[9] = output_sample_fasta_linearized  # Replace the fasta file in the command
+                # Re-run chloe with linearised fasta
+                cmd[9] = output_sample_fasta_linearised  # Replace the fasta file in the command
 
-                logger.debug(f"{"[DEBUG]:":10} Re-annotating {filename_prefix} with linearized sequence: {cmd}")
+                logger.debug(f"{"[DEBUG]:":10} Re-annotating {filename_prefix} with linearised sequence: {cmd}")
                 
                 result = subprocess.run(
                     cmd,
@@ -2325,10 +2346,15 @@ def annotate_genomes(genome_fasta_dir, output_directory, chloe_project_dir=None,
    
                 logger.debug(f"{"[DEBUG]:":10} Re-annotation complete for {filename_prefix}")
 
-        # Store the linearized files
-        annotated_genomes[filename_prefix_no_dots]['gbk'] = output_sample_gbk_linearized
-        annotated_genomes[filename_prefix_no_dots]['gff'] = output_sample_gff_linearized
-        annotated_genomes[filename_prefix_no_dots]['fasta'] = output_sample_fasta_linearized
+        # Store the linearised files
+        if should_linearise:
+            annotated_genomes[filename_prefix_no_dots]['gbk'] = output_sample_gbk_linearised
+            annotated_genomes[filename_prefix_no_dots]['gff'] = output_sample_gff_linearised
+            annotated_genomes[filename_prefix_no_dots]['fasta'] = output_sample_fasta_linearised
+        else:
+            annotated_genomes[filename_prefix_no_dots]['gbk'] = output_sample_gbk_original
+            annotated_genomes[filename_prefix_no_dots]['gff'] = output_sample_gff_original
+            annotated_genomes[filename_prefix_no_dots]['fasta'] = fasta_file
 
     utils.log_separator(logger)
     time.sleep(0.1)
@@ -2356,18 +2382,17 @@ def convert_gbk_to_embl(annotated_genomes_dict, output_directory, metadata_dict=
         None
     """
 
+    logger.info(f"{"[INFO]:":10} Converting GenBank files to EMBL format...")
+
     # Create EMBL output directory
     embl_output_dir = os.path.join(output_directory, '02_embl_files')
     os.makedirs(embl_output_dir, exist_ok=True)
     
-    # Get default metadata for samples without specific metadata
-    default_metadata = get_default_metadata()
- 
     # Track metadata usage
     samples_with_metadata = 0
-    samples_without_metadata = 0
     
     for sample_name, genome_info in annotated_genomes_dict.items():
+
         if 'error' in genome_info:
             logger.warning(f"{"[WARNING]:":10} Skipping {sample_name} - has error: {genome_info['error']}")
             continue
@@ -2383,20 +2408,18 @@ def convert_gbk_to_embl(annotated_genomes_dict, output_directory, metadata_dict=
             continue
         
         # Get fasta filename for metadata lookup
-        fasta_filename = os.path.basename(fasta_file).split('_linearized')[0]
+        fasta_filename = genome_info['original_fasta']
         
-        # Get metadata for this sample
-        if metadata_dict and fasta_filename in metadata_dict:
+        # Get metadata for this sample (all samples must be in metadata by this point)
+        if fasta_filename in metadata_dict:
             sample_metadata = metadata_dict[fasta_filename]
             samples_with_metadata += 1
             logger.debug(f"{"[DEBUG]:":10} Using metadata for {sample_name} (fasta: {fasta_filename})")
         else:
-            sample_metadata = default_metadata
-            samples_without_metadata += 1
-            if metadata_dict:
-                logger.debug(f"{"[DEBUG]:":10} No metadata found for {sample_name} (fasta: {fasta_filename}), using defaults")
-            else:
-                logger.debug(f"{"[DEBUG]:":10} Using default metadata for {sample_name}")
+            # This should not happen if metadata coverage was validated during parsing
+            logger.error(f"{"[ERROR]:":10} Sample {sample_name} (fasta: {fasta_filename}) not found in metadata!")
+            logger.error(f"{"":10} All samples must be present in metadata file")
+            utils.exit_program()
         
         # Extract metadata values
         locus_tag_prefix = sample_metadata['locus_tag']
@@ -2572,10 +2595,7 @@ def convert_gbk_to_embl(annotated_genomes_dict, output_directory, metadata_dict=
     logger.info(f"{"[INFO]:":10} EMBL conversion complete. Files written to: {embl_output_dir}")
     
     # Log metadata usage summary
-    if metadata_dict:
-        logger.debug(f"{"[DEBUG]:":10} Metadata usage: {samples_with_metadata} samples with metadata, {samples_without_metadata} samples with defaults")
-    else:
-        logger.debug(f"{"[DEBUG]:":10} All {samples_with_metadata + samples_without_metadata} samples used default metadata")
+    logger.debug(f"{"[DEBUG]:":10} Successfully processed {samples_with_metadata} samples with metadata")
     
     utils.log_separator(logger)
 
@@ -3304,29 +3324,34 @@ def write_blast_report(blast_results, output_file, sample_name, logger=None):
             logger.error(traceback.format_exc())
 
 
-def parse_metadata_tsv(metadata_file_path, logger):
+def parse_metadata_tsv(metadata_file_path, genome_fasta_dir, logger):
     """
     Parse and validate the metadata TSV file for EMBL conversion.
     
     This function reads a TSV file containing sample metadata and validates:
     1. File format and required columns
-    2. Data completeness and format
-    3. Consistency of the data
+    2. Data completeness for required fields (fasta_filename, linear_or_circular)
+    3. Uses defaults for optional empty fields (project_id, locus_tag, genus_species)
+    4. Validates that ALL FASTA files in the genome directory have metadata entries
     
     Args:
         metadata_file_path (str): Path to the metadata TSV file
+        genome_fasta_dir (str): Path to directory containing genome fasta files
         logger: Logger instance for logging messages and errors
         
     Returns:
         dict: Dictionary mapping fasta_filename to metadata dictionary containing:
-            - project_id: Project identifier
-            - locus_tag: Locus tag prefix
-            - genus_species: Genus and species name
-            - linear_or_circular: Whether the genome is linear or circular
+            - project_id: Project identifier (uses default if empty)
+            - locus_tag: Locus tag prefix (uses default if empty)
+            - genus_species: Genus and species name (uses default if empty)
+            - linear_or_circular: Whether the genome is linear or circular (required)
             
     Raises:
         SystemExit: If the file cannot be parsed or contains invalid data
-    """
+"""
+
+    logger.info(f"{"[INFO]:":10} Parsing metadata TSV file: {metadata_file_path}")
+
     required_columns = [
         'fasta_filename', 'project_id', 'locus_tag', 'genus_species', 'linear_or_circular'
     ]
@@ -3355,8 +3380,8 @@ def parse_metadata_tsv(metadata_file_path, logger):
                 logger.error(f"{"":10} {row['fasta_filename']}")
             utils.exit_program()
         
-        # Check for missing values in required fields
-        required_fields = ['fasta_filename', 'project_id', 'locus_tag', 'genus_species', 'linear_or_circular']
+        # Check for missing values in required fields (only fasta_filename and linear_or_circular must have values)
+        required_fields = ['fasta_filename', 'linear_or_circular']
         for field in required_fields:
             missing_values = metadata_df[metadata_df[field].isna() | (metadata_df[field] == '')]
             if not missing_values.empty:
@@ -3365,20 +3390,62 @@ def parse_metadata_tsv(metadata_file_path, logger):
                     logger.error(f"{"":10} {row['fasta_filename']}")
                 utils.exit_program()
         
-        # Convert to dictionary
+        # Validate linear_or_circular values
+        valid_topologies = {'linear', 'circular'}
+        invalid_topologies = metadata_df[~metadata_df['linear_or_circular'].isin(valid_topologies)]
+        if not invalid_topologies.empty:
+            logger.error(f"{"[ERROR]:":10} Invalid values in 'linear_or_circular' field. Must be 'linear' or 'circular':")
+            for _, row in invalid_topologies.iterrows():
+                logger.error(f"{"":10} fasta_filename: {row['fasta_filename']}, value: '{row['linear_or_circular']}'")
+            utils.exit_program()
+        
+        # Convert to dictionary, using defaults for empty optional fields
         metadata_dict = {}
+        
         for _, row in metadata_df.iterrows():
             fasta_filename = row['fasta_filename'].strip()
             metadata_dict[fasta_filename] = {
-                'project_id': row['project_id'].strip(),
-                'locus_tag': row['locus_tag'].strip(),
-                'genus_species': row['genus_species'].strip(),
+                'project_id': row.get('project_id', '').strip() or 'UNKNOWN_PROJECT',
+                'locus_tag': row.get('locus_tag', '').strip() or 'DEFAULT_TAG',
+                'genus_species': row.get('genus_species', '').strip() or 'Unknown species',
                 'linear_or_circular': row['linear_or_circular'].strip()
             }
         
-        logger.info(f"{"[INFO]:":10} Successfully parsed metadata TSV file: {len(metadata_dict)} samples")
+        logger.debug(f"{"[DEBUG]:":10} Successfully parsed metadata TSV file: {len(metadata_dict)} samples")
         logger.debug(f"{"[DEBUG]:":10} Sample entries: {list(metadata_dict.keys())[:5]}")
         
+        # Check that all FASTA files in the input directory have metadata entries
+        fasta_files = glob.glob(os.path.join(genome_fasta_dir, "*.fasta")) + \
+                     glob.glob(os.path.join(genome_fasta_dir, "*.fa")) + \
+                     glob.glob(os.path.join(genome_fasta_dir, "*.fas"))
+        
+        if not fasta_files:
+            logger.warning(f"{"[WARNING]:":10} No FASTA files found in {genome_fasta_dir}")
+        else:
+            # Get list of FASTA filenames that should be in metadata
+            expected_fasta_files = []
+            for fasta_file in fasta_files:
+                fasta_filename = os.path.basename(fasta_file)
+                expected_fasta_files.append(fasta_filename)
+            
+            # Check for missing metadata entries
+            missing_from_metadata = []
+            for fasta_filename in expected_fasta_files:
+                if fasta_filename not in metadata_dict:
+                    missing_from_metadata.append(fasta_filename)
+            
+            logger.info(f"{"[INFO]:":10} Metadata coverage: {len(expected_fasta_files) - len(missing_from_metadata)}/{len(expected_fasta_files)} samples")
+            
+            if missing_from_metadata:
+                logger.error(f"{"[ERROR]:":10} ALL samples must be present in metadata file!")
+                logger.error(f"{"":10} {len(missing_from_metadata)} samples are missing from metadata:")
+                for fasta_filename in missing_from_metadata:
+                    logger.error(f"{"":15} {fasta_filename}")
+                logger.error(f"{"":10} Please add all missing samples to your metadata TSV file")
+                utils.exit_program()
+        
+        utils.log_separator(logger)
+
         return metadata_dict
         
     except pd.errors.EmptyDataError:
@@ -3391,66 +3458,6 @@ def parse_metadata_tsv(metadata_file_path, logger):
         logger.error(f"{"[ERROR]:":10} Unexpected error reading metadata TSV file: {e}")
         logger.error(traceback.format_exc())
         utils.exit_program()
-
-
-def get_default_metadata():
-    """
-    Get default metadata values for samples without metadata.
-    
-    Returns:
-        dict: Dictionary containing default metadata values
-    """
-    return {
-        'project_id': 'UNKNOWN_PROJECT',
-        'locus_tag': 'DEFAULT_TAG',
-        'genus_species': 'Unknown species',
-        'linear_or_circular': 'linear_or_circular'
-    }
-
-
-def check_metadata_coverage(annotated_genomes_dict, metadata_dict, logger):
-    """
-    Check metadata coverage for fasta files and provide information messages.
-    
-    Args:
-        annotated_genomes_dict (dict): Dictionary of annotated genome information
-        metadata_dict (dict): Dictionary mapping fasta_filename to metadata
-        logger: Logger instance for logging messages
-        
-    Returns:
-        None
-    """
-
-    if not metadata_dict:
-        return
-    
-    total_samples = len(annotated_genomes_dict)
-    samples_with_metadata = 0
-    samples_without_metadata = []
-    
-    for sample_name, genome_info in annotated_genomes_dict.items():
-        if 'error' in genome_info:
-            continue
-            
-        fasta_file = genome_info.get('fasta')
-        if not fasta_file or not os.path.exists(fasta_file):
-            continue
-        
-        fasta_filename = os.path.basename(fasta_file).split('_linearized')[0]
-        if fasta_filename in metadata_dict:
-            samples_with_metadata += 1
-        else:
-            samples_without_metadata.append(fasta_filename)
-    
-    logger.info(f"{"[INFO]:":10} Metadata coverage: {samples_with_metadata}/{total_samples} samples have metadata")
-    
-    if samples_without_metadata:
-        logger.info(f"{"[INFO]:":10} Samples without metadata (will use defaults):\n")
-        for fasta_filename in samples_without_metadata[:10]:  # Show first 10
-            logger.info(f"{"":15} {fasta_filename}")
-        if len(samples_without_metadata) > 10:
-            logger.info(f"{"":15} ... and {len(samples_without_metadata) - 10} more")
-        logger.info("")
 
 
 def main(args):
@@ -3491,6 +3498,9 @@ def main(args):
 
         # Check no_alignment and refs_order
         ref_gene_seqrecords = check_no_alignment_and_refs_order(args, gene_median_lengths, gene_synonyms)
+
+        # Parse required metadata TSV file
+        metadata_dict = parse_metadata_tsv(args.metadata_tsv, args.genome_fasta_dir, logger)
  
         # Annotate the genomes using chloë, honoring optional user-specified chloe paths
         annotated_genomes_dict = annotate_genomes(
@@ -3498,25 +3508,14 @@ def main(args):
             args.output_directory,
             getattr(args, 'chloe_project_dir', None),
             getattr(args, 'chloe_script', None),
-            getattr(args, 'linearize_gene', 'psbA')
+            getattr(args, 'linearise_gene', 'psbA'),
+            metadata_dict
         )
 
         # Check genes and write reports
         all_sample_results = check_genes(gene_median_lengths, annotated_genomes_dict, args.min_length_percentage, args.max_length_percentage, 
                                          args.report_directory, log_queue, args.pool, gene_synonyms)
 
-        # Parse metadata TSV file if provided
-        metadata_dict = None
-        logger.info(f"{"[INFO]:":10} Converting GenBank files to EMBL format...")
-        if args.metadata_tsv:
-            logger.info(f"{"[INFO]:":10} Parsing metadata TSV file: {args.metadata_tsv}")
-            metadata_dict = parse_metadata_tsv(args.metadata_tsv, logger)
-        else:
-            logger.info(f"{"[INFO]:":10} No metadata TSV file provided, will use default values for EMBL conversion")
- 
-        # Check metadata coverage for fasta files
-        check_metadata_coverage(annotated_genomes_dict, metadata_dict, logger)
- 
         # Convert assembly gbk files to embl format
         convert_gbk_to_embl(annotated_genomes_dict, args.output_directory, metadata_dict=metadata_dict)
 
@@ -3539,3 +3538,4 @@ def main(args):
         utils.log_completion_time(start_time, logger if ('logger' in globals() and logger) else None, label="PAV subcommand `annotate_and_check` completed")
 
         utils.log_manager.cleanup()
+        

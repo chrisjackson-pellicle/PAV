@@ -16,12 +16,18 @@ def annotate_and_check_parser(subparsers):
     parser_annotate_and_check = subparsers.add_parser('annotate_and_check', help='Annotate and check plastid DNA')
     
     ####################################################################################################################
-    required_group = parser_annotate_and_check.add_argument_group('Required input')
+    required_positional_group = parser_annotate_and_check.add_argument_group('Required input')
     
-    required_group.add_argument('genome_fasta_dir',
-   
+    required_positional_group.add_argument('genome_fasta_dir',
                                 metavar='DIR',
                                 help='Directory containing plastid DNA FASTA files.')
+    
+    required_positional_group.add_argument('metadata_tsv',
+                                metavar='TSV',
+                                help='TSV file containing sample metadata for EMBL conversion. Required file should contain columns: '
+                                'fasta_filename, project_id, locus_tag, genus_species, linear_or_circular. '
+                                'ALL samples must be listed. Only fasta_filename and linear_or_circular require values; '
+                                'empty optional fields will use defaults. linear_or_circular must be "linear" or "circular".')
 
     ####################################################################################################################
     optional_group_gene_length_warnings= parser_annotate_and_check.add_argument_group('Gene length warnings')
@@ -130,13 +136,6 @@ def annotate_and_check_parser(subparsers):
                                  help='Maximum number of BLAST hits to retain per intergenic region. Default is: %(default)s')
 
     ####################################################################################################################
-    embl_group = parser_annotate_and_check.add_argument_group('EMBL conversion options')
-    
-    embl_group.add_argument('--metadata_tsv', '-metadata',
-                           type=str,
-                           default=None,
-                           metavar='FILE',
-                           help='TSV file containing sample metadata for EMBL conversion. File should contain columns: '
-                                'fasta_filename, project_id, locus_tag, genus_species, linear_or_circular. If not provided, default values will be used.')
+
 
     return parser_annotate_and_check

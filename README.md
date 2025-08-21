@@ -1,3 +1,11 @@
+            ██████╗      █████╗     ██╗   ██╗
+            ██╔══██╗    ██╔══██╗    ██║   ██║
+            ██████╔╝    ███████║    ██║   ██║
+            ██╔═══╝     ██╔══██║    ╚██╗ ██╔╝
+            ██║         ██║  ██║     ╚████╔╝ 
+            ╚═╝         ╚═╝  ╚═╝      ╚═══╝  
+
+
 # Plastid Annotation Validator (PAV)
 
 A tool for annotating and validating angiosperm plastid genome annotations, with support for reference-based alignment, quality assessment, and characterisation of intergenic regions. 
@@ -9,7 +17,7 @@ PAV is designed to process plastid genome assemblies, perform automated annotati
 ## Features
 
 - **Automated Annotation**: Uses Chloë for plastid genome annotation
-- **Genome Linearization**: Automatically linearizes genomes upstream of a specified gene (defaults to `psbA`)
+- **Genome Linearisation**: Automatically linearises genomes upstream of a specified gene (defaults to `psbA`)
 - **Reference-Based Validation**: Compares annotations against reference genomes from multiple sources (order-specific, default, or custom)
 - **Quality Assessment**: Validates gene lengths, identifies internal stop codons, and checks for canonical start and stop codons
 - **Alignment Generation**: Creates nucleotide alignments with reference sequences for CDS, rRNA, and tRNA genes
@@ -64,17 +72,19 @@ PAV is designed to process plastid genome assemblies, perform automated annotati
 
 ```bash
 pav annotate_and_check \
-  --input_dir /path/to/fasta/files \
-  --output_dir /path/to/output
+  /path/to/fasta/files \
+  /path/to/metadata.tsv \
+  --output_directory /path/to/output
 ```
 
 ### Command Line Options
 
-#### Required Arguments
-- `--input_dir`: Directory containing input FASTA files
-- `--output_dir`: Directory for output files
+#### Required Positional Arguments
+- `genome_fasta_dir`: Directory containing input FASTA files
+- `metadata_tsv`: TSV file containing sample metadata
 
 #### Optional Arguments
+- `--output_directory`: Directory for output files (default: output_directory)
 - `--refs_order`: Reference order(s) to use for validation (can specify multiple)
 - `--custom_refs_folder`: Custom folder containing reference GenBank files (can be used in addition to --refs_order or default references)
 - `--no_alignment`: Skip alignment generation
@@ -82,8 +92,7 @@ pav annotate_and_check \
 - `--max_length_percentage`: Maximum gene length percentage (default: 1.2)
 - `--pool`: Number of processes for multiprocessing (default: 1)
 - `--threads`: Number of threads per process (default: 1)
-- `--linearize_gene`: Gene to use for genome linearization (default: psbA)
-- `--metadata_tsv`: TSV file providing sample metadata for EMBL/ENA conversion
+- `--linearise_gene`: Gene to use for genome linearisation (default: psbA)
 - `--skip_intergenic_analysis`: Skip intergenic BLAST analysis
 - `--min_intergenic_length`: Minimum intergenic length to analyze (default: 0)
 - `--blast_evalue`: BLAST E-value threshold (default: 1e-10)
@@ -95,31 +104,31 @@ pav annotate_and_check \
 #### Basic annotation and validation:
 ```bash
 pav annotate_and_check \
-  --input_dir genomes/ \
-  --output_dir results/
+  genomes/ \
+  metadata.tsv
 ```
 
 #### Multiple reference orders:
 ```bash
 pav annotate_and_check \
-  --input_dir genomes/ \
-  --output_dir results/ \
+  genomes/ \
+  metadata.tsv \
   --refs_order Alismatales Poales Arecales
 ```
 
 #### Custom reference folder:
 ```bash
 pav annotate_and_check \
-  --input_dir genomes/ \
-  --output_dir results/ \
+  genomes/ \
+  metadata.tsv \
   --custom_refs_folder /path/to/custom/references/
 ```
 
 #### Combined reference sources:
 ```bash
 pav annotate_and_check \
-  --input_dir genomes/ \
-  --output_dir results/ \
+  genomes/ \
+  metadata.tsv \
   --refs_order Alismatales \
   --custom_refs_folder /path/to/custom/references/
 ```
@@ -127,24 +136,25 @@ pav annotate_and_check \
 #### Skip alignments:
 ```bash
 pav annotate_and_check \
-  --input_dir genomes/ \
-  --output_dir results/ \
+  genomes/ \
+  metadata.tsv \
   --no_alignment
 ```
 
 #### Custom linearization gene:
 ```bash
 pav annotate_and_check \
-  --input_dir genomes/ \
-  --output_dir results/ \
-  --linearize_gene rbcL
+  genomes/ \
+  metadata.tsv \
+  --linearise_gene rbcL
 ```
 
 #### Custom parameters:
 ```bash
 pav annotate_and_check \
-  --input_dir genomes/ \
-  --output_dir results/ \
+  genomes/ \
+  metadata.tsv \
+  --output_directory results/ \
   --refs_order Alismatales \
   --min_length_percentage 0.9 \
   --max_length_percentage 1.1 \
@@ -168,10 +178,10 @@ output_dir/
 │   └── sample_name/
 │       ├── <prefix>.chloe.original.gbk          # Original annotation (preserved)
 │       ├── <prefix>.chloe.original.gff          # Original GFF (preserved)
-│       ├── <prefix>_linearized.chloe.gbk        # Re-annotated after linearization
-│       ├── <prefix>_linearized.chloe.gff        # Re-annotated after linearization
-│       └── <prefix>_linearized.fasta            # Linearized sequence
-│       └── <prefix>_linearized.chloe_intergenic_debug.fasta   # Optional (when --debug_intergenic)
+│       ├── <prefix>_linearised.chloe.gbk        # Re-annotated after linearisation
+│       ├── <prefix>_linearised.chloe.gff        # Re-annotated after linearisation
+│       └── <prefix>_linearised.fasta            # Linearised sequence
+│       └── <prefix>_linearised.chloe_intergenic_debug.fasta   # Optional (when --debug_intergenic)
 ├── 02_embl_files/
 │   ├── <sample_name>.embl                        # EMBL format
 │   └── <sample_name>.ena.embl                    # ENA template (derived from EMBL)
@@ -194,8 +204,8 @@ output_dir/
 ### 1. Genome Annotation
 - Processes input FASTA files using Chloë
 - Performs initial annotation on original sequences
-- Linearizes genomes upstream of a specified gene (default: psbA)
-- Re-annotates linearized sequences
+- Linearises genomes upstream of a specified gene (default: psbA), unless sample is recorded as `linear` in metadata
+- Re-annotates linearised sequences
 
 ### 2. Reference Validation
 - Loads reference sequences from multiple sources (CDS, rRNA, and tRNA)
@@ -232,11 +242,18 @@ Example (`metadata.tsv`):
 |----------------|------------|-----------|---------------|--------------------|
 | sample1.fasta  | PRJEB12345 | ABC       | Arabidopsis thaliana | circular |
 | sample2.fasta  | PRJEB98765 | XYZ       | Oryza sativa | linear |
+up| sample3.fasta  |            |           |               | circular |
 
 
 Notes:
-- Only the columns above are required; defaults are used for anything else
+- All columns above must be present in the header, but only `fasta_filename` and `linear_or_circular` require values
+- Empty optional fields will use these default values:
+  - `project_id` → `'UNKNOWN_PROJECT'`
+  - `locus_tag` → `'DEFAULT_TAG'`
+  - `genus_species` → `'Unknown species'`
 - The topology is used in the ENA `ID` line and must match one of: `linear`, `circular`
+- **ALL samples must be present in the metadata file** - PAV will fail if any samples are missing
+- Samples marked as `linear` will **not be re-linearised** at the `--linearise_gene` position, preserving their original linear structure
 
 ## Gene Types Supported
 
@@ -261,7 +278,7 @@ Reference sequences are named using the format: `{Order}_{Family}_{Genus}_{Speci
 - **GenBank**: Annotated genomes in GenBank format
 - **GFF**: Gene feature format files
 - **EMBL**: European Molecular Biology Laboratory format
-- **FASTA**: Aligned sequences and linearized genomes
+- **FASTA**: Aligned sequences and linearised genomes
 
 ## Reference Data
 
