@@ -339,7 +339,7 @@ For issues and questions:
 - Review the documentation
 - Open an issue on GitHub
 
-## Misc links
+## Misc. links
 
 - ENA EMBL flatfile example: https://ena-docs.readthedocs.io/en/latest/submit/fileprep/flat-file-example.html
 
