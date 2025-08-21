@@ -41,6 +41,7 @@ PAV is designed to process plastid genome assemblies, perform automated annotati
    ```bash
    git clone https://github.com/chrisjackson-pellicle/PAV.git
    cd PAV
+   pip install .
    ```
 
 2. **Install dependencies**:
