@@ -45,7 +45,7 @@ from collections import defaultdict
 from Bio import SeqIO
 from Bio.SeqRecord import SeqRecord
 from Bio.Seq import Seq
-from Bio.SeqFeature import FeatureLocation, SeqFeature
+from Bio.SeqFeature import FeatureLocation, SeqFeature, CompoundLocation
 import traceback
 from copy import deepcopy
 from concurrent.futures import ProcessPoolExecutor, as_completed
@@ -2421,35 +2421,109 @@ def convert_gbk_to_embl(annotated_genomes_dict, output_directory, metadata_dict=
                 }
             )
             record.features.insert(0, source_feature)
-            
-            # Modify features for EMBL output
-            locus_counter = 1
-            
-            # First pass: collect all gene names and repeat regions to assign locus tags
-            gene_locus_map = {}  # gene_name -> locus_tag
-            repeat_locus_map = {}  # repeat_id -> locus_tag
 
+            # Remove all existing locus_tags
             for feature in record.features:
-                if feature.type in ['gene', 'CDS', 'tRNA', 'intron']:
-                    # Get gene name from qualifiers
+                if 'locus_tag' in feature.qualifiers:
+                    del feature.qualifiers['locus_tag']
+            
+            # Initialize locus counter before any special-case tagging
+            locus_counter = 1
+
+            # Special handling for rps12:
+            # - Keep the two rps12 CDS features
+            # - Create a corresponding gene feature for each CDS with identical coordinates
+            # - Remove all other rps12 features (e.g., gene or intron features that don't match the CDS)
+            try:
+                rps12_cds = []
+                for f in record.features:
+                    if f.type == 'CDS' and 'gene' in f.qualifiers and f.qualifiers['gene'][0] == 'rps12':
+                        rps12_cds.append(f)
+
+                if rps12_cds:
+                    # Remove all non-CDS rps12 features
+                    new_features = []
+                    for f in record.features:
+                        gene_name = None
+                        if 'gene' in f.qualifiers:
+                            gene_name = f.qualifiers['gene'][0]
+                        elif 'product' in f.qualifiers:
+                            gene_name = f.qualifiers['product'][0]
+                        if gene_name == 'rps12' and f.type != 'CDS':
+                            continue
+                        new_features.append(f)
+
+                    # Insert a gene feature immediately before each rps12 CDS
+                    for cds in rps12_cds:
+                        try:
+                            insert_at = new_features.index(cds)
+                        except ValueError:
+                            insert_at = len(new_features)
+                        rps12_gene_feature = SeqFeature(
+                            location=cds.location,
+                            type='gene',
+                            qualifiers={'gene': ['rps12']}
+                        )
+                        # Assign a shared locus_tag for the CDS and its paired gene feature
+                        pair_tag = f"{locus_tag_prefix}_LOCUS{locus_counter}"
+                        locus_counter += 1
+                        rps12_gene_feature.qualifiers['locus_tag'] = [pair_tag]
+                        cds.qualifiers['locus_tag'] = [pair_tag]
+                        new_features.insert(insert_at, rps12_gene_feature)
+
+                    record.features = new_features
+            except Exception:
+                # Fail-safe: proceed without special handling if any unexpected structure is encountered
+                pass
+
+            # Modify features for EMBL output
+            
+            # First pass: identify gene groups and assign locus_tags in order
+            gene_occurrence_map = {}  # gene_name -> occurrence_count
+            gene_group_locus_map = {}  # (gene_name, occurrence) -> locus_tag
+            feature_to_gene_group = {}  # feature_index -> (gene_name, occurrence)
+            
+            for idx, feature in enumerate(record.features):
+                if feature.type in ['gene', 'CDS', 'tRNA', 'rRNA', 'intron']:
+                    # Skip if already has a locus_tag (e.g., from rps12 special handling)
+                    if 'locus_tag' in feature.qualifiers:
+                        continue
+                        
+                    # Get gene name
                     gene_name = None
                     if 'gene' in feature.qualifiers:
                         gene_name = feature.qualifiers['gene'][0]
-                    elif 'product' in feature.qualifiers:
-                        gene_name = feature.qualifiers['product'][0]
-                    
-                    if gene_name and gene_name not in gene_locus_map:
-                        gene_locus_map[gene_name] = f"{locus_tag_prefix}_LOCUS{locus_counter}"
-                        locus_counter += 1
-                
+      
+                    if gene_name:
+                        # Determine which occurrence of this gene we're dealing with
+                        if feature.type == 'gene':
+                            # New gene occurrence
+                            gene_occurrence_map[gene_name] = gene_occurrence_map.get(gene_name, 0) + 1
+                            current_occurrence = gene_occurrence_map[gene_name]
+                            
+                            # Assign new locus tag for this gene occurrence
+                            gene_group = (gene_name, current_occurrence)
+                            gene_group_locus_map[gene_group] = f"{locus_tag_prefix}_LOCUS{locus_counter}"
+                            locus_counter += 1
+                        else:
+                            # Feature belongs to the most recent occurrence of this gene
+                            current_occurrence = gene_occurrence_map.get(gene_name, 1)
+                            gene_group = (gene_name, current_occurrence)
+                            
+                            # Create locus tag if this is the first feature for a gene without a gene feature
+                            if gene_group not in gene_group_locus_map:
+                                gene_occurrence_map[gene_name] = current_occurrence
+                                gene_group_locus_map[gene_group] = f"{locus_tag_prefix}_LOCUS{locus_counter}"
+                                locus_counter += 1
+                        
+                        feature_to_gene_group[idx] = gene_group
+                        
                 elif feature.type == 'repeat_region':
-                    # For repeat regions, assign locus tags sequentially
-                    repeat_id = f"repeat_{len(repeat_locus_map) + 1}"
-                    repeat_locus_map[repeat_id] = f"{locus_tag_prefix}_LOCUS{locus_counter}"
+                    feature.qualifiers['locus_tag'] = [f"{locus_tag_prefix}_LOCUS{locus_counter}"]
                     locus_counter += 1
-            
-            # Second pass: apply locus tags and CDS-specific modifications
-            for feature in record.features:
+
+            # Second pass: apply locus tags and other modifications
+            for idx, feature in enumerate(record.features):
                 # Remove /ID= and /parent= and /name qualifiers if present (not used in EMBL format)
                 if 'ID' in feature.qualifiers:
                     del feature.qualifiers['ID']
@@ -2458,27 +2532,13 @@ def convert_gbk_to_embl(annotated_genomes_dict, output_directory, metadata_dict=
                 if 'name' in feature.qualifiers:
                     del feature.qualifiers['name']
                 
-                if feature.type in ['gene', 'CDS', 'tRNA', 'intron']:
-                    # Get gene name from qualifiers
-                    gene_name = None
-                    if 'gene' in feature.qualifiers:
-                        gene_name = feature.qualifiers['gene'][0]
-                    elif 'product' in feature.qualifiers:
-                        gene_name = feature.qualifiers['product'][0]
-                    
-                    if gene_name and gene_name in gene_locus_map:
-                        feature.qualifiers['locus_tag'] = [gene_locus_map[gene_name]]
-                
-                elif feature.type == 'repeat_region':
-                    # For repeat regions, assign locus tags based on their order in the features list
-                    repeat_count = 0
-                    for f in record.features:
-                        if f.type == 'repeat_region':
-                            repeat_count += 1
-                            if f == feature:  # Found the current feature
-                                repeat_id = f"repeat_{repeat_count}"
-                                feature.qualifiers['locus_tag'] = [repeat_locus_map[repeat_id]]
-                                break
+                if feature.type in ['gene', 'CDS', 'tRNA', 'rRNA', 'intron']:
+                    # Skip if already has a locus_tag (e.g., from rps12 special handling)
+                    if 'locus_tag' not in feature.qualifiers:
+                        if idx in feature_to_gene_group:
+                            gene_group = feature_to_gene_group[idx]
+                            if gene_group in gene_group_locus_map:
+                                feature.qualifiers['locus_tag'] = [gene_group_locus_map[gene_group]]
                 
                 # Additional modifications for CDS features
                 if feature.type == 'CDS':

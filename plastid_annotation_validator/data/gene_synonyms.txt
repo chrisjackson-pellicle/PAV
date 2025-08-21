@@ -32,9 +32,6 @@ carboxytransferase beta subunit = accD
 # atpA (ATP synthase CF1 alpha subunit)
 AT Psynthase CF1 alpha subunit = atpA
 ATPA = atpA
-ATP synthase CF0 A chain = atpA
-ATP synthase CF0 A subunit = atpA
-ATP synthase CF0 subunit A = atpA
 ATP synthase CF1 alpha chain = atpA
 ATP synthase CF1 alpha subunit = atpA
 ATP synthase CF1 subunit alpha = atpA
@@ -50,7 +47,7 @@ atpA = atpA
 atpL = atpA
 CF1 alpha subunit = atpA
 CF1 subunit alpha = atpA
-PsaL = atpA
+# PsaL = atpA
 
 # atpB (ATP synthase CF1 beta subunit)
 ATPB = atpB
@@ -87,6 +84,7 @@ ATP systhase CFO B subunit = atpF
 AtpF = atpF
 atpF = atpF
 
+
 # atpH (ATP synthase CF0 C subunit)
 ATPH = atpH
 ATP synthase CF0 A chain subunit IV = atpH
@@ -122,6 +120,9 @@ AtpI = atpI
 atpI = atpI
 CF0 subunit I = atpI
 synthase CF0 subunit I = atpI
+ATP synthase CF0 A chain = atpI
+ATP synthase CF0 A subunit = atpI
+ATP synthase CF0 subunit A = atpI
 
 # ================================================================================
 # CYTOCHROME C SYNTHESIS (ccs genes)
