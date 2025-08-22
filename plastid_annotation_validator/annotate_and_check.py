@@ -2111,7 +2111,12 @@ def generate_per_gene_alignments(all_sample_results, ref_gene_seqrecords, output
             
             for i, cds_info in enumerate(cds_info_list):
                 seq = cds_info['cds_seq']
-                seqrecord = SeqRecord(seq=seq, id=f"{sample_name}_{base_gene_name}_copy_{i+1}", description=f"CDS from {sample_name}")
+                # Extract original copy number from gene name if present
+                if '_copy_' in gene_name:
+                    copy_num = gene_name.split('_copy_')[1]
+                else:
+                    copy_num = str(i + 1)
+                seqrecord = SeqRecord(seq=seq, id=f"{sample_name}_{base_gene_name}_copy_{copy_num}", description=f"CDS from {sample_name}")
                 gene_sequences[base_gene_name].append(seqrecord)
         
         # Process rRNA genes
@@ -2125,7 +2130,12 @@ def generate_per_gene_alignments(all_sample_results, ref_gene_seqrecords, output
             
             for i, rRNA_info in enumerate(rRNA_info_list):
                 seq = rRNA_info['rRNA_seq']
-                seqrecord = SeqRecord(seq=seq, id=f"{sample_name}_{base_gene_name}_copy_{i+1}", description=f"rRNA from {sample_name}")
+                # Extract original copy number from gene name if present
+                if '_copy_' in gene_name:
+                    copy_num = gene_name.split('_copy_')[1]
+                else:
+                    copy_num = str(i + 1)
+                seqrecord = SeqRecord(seq=seq, id=f"{sample_name}_{base_gene_name}_copy_{copy_num}", description=f"rRNA from {sample_name}")
                 gene_sequences[base_gene_name].append(seqrecord)
         
         # Process tRNA genes
@@ -2139,7 +2149,12 @@ def generate_per_gene_alignments(all_sample_results, ref_gene_seqrecords, output
             
             for i, tRNA_info in enumerate(tRNA_info_list):
                 seq = tRNA_info['tRNA_seq']
-                seqrecord = SeqRecord(seq=seq, id=f"{sample_name}_{base_gene_name}_copy_{i+1}", description=f"tRNA from {sample_name}")
+                # Extract original copy number from gene name if present
+                if '_copy_' in gene_name:
+                    copy_num = gene_name.split('_copy_')[1]
+                else:
+                    copy_num = str(i + 1)
+                seqrecord = SeqRecord(seq=seq, id=f"{sample_name}_{base_gene_name}_copy_{copy_num}", description=f"tRNA from {sample_name}")
                 gene_sequences[base_gene_name].append(seqrecord)
     
     # Prepare alignment tasks
