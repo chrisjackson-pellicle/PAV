@@ -19,12 +19,15 @@ Main Features:
 
 Usage:
     pav annotate_and_check [options]
+    pav check [options]
     
     For help on specific subcommands:
     pav annotate_and_check --help
+    pav check --help
 
 Subcommands:
     annotate_and_check    Main annotation and validation pipeline
+    check                 Continue pipeline from annotated GenBank files
     
 Options:
     --version             Show version information
@@ -33,10 +36,13 @@ Options:
 
 Examples:
     # Basic annotation and validation
-    pav annotate_and_check -i genomes/ -o output/
+    pav annotate_and_check genomes/ metadata.tsv -o output/
     
     # With custom parameters
-    pav annotate_and_check -i genomes/ -o output/ --min-length-percentage 80 --max-length-percentage 120
+    pav annotate_and_check genomes/ metadata.tsv -o output/ --min-length-percentage 80 --max-length-percentage 120
+    
+    # Continue pipeline from annotated GenBank files
+    pav check annotated_genbank/ metadata.tsv -o output/
 
 Dependencies:
     - chloë: Genome annotation pipeline
@@ -77,8 +83,27 @@ def annotate_and_check_main(args):
 
     args.subcommand_name = subcommand_name
 
-    # Run main() from module pav.py
+    # Run main() from module annotate_and_check.py
     annotate_and_check.main(args)
+
+
+def check_main(args):
+    """
+    Calls the function check_pipeline() from module annotate_and_check
+
+    :param args: argparse namespace with subparser options for function check_pipeline()
+    :return: None: no return value specified; default is None
+    """
+
+    if len(sys.argv) > 1:
+        subcommand_name = sys.argv[1]
+    else:
+        subcommand_name = 'check'
+
+    args.subcommand_name = subcommand_name
+
+    # Run check_pipeline() from module annotate_and_check
+    annotate_and_check.check_pipeline(args)
 
 
 def parse_arguments():
@@ -101,10 +126,12 @@ def parse_arguments():
     # Add subparsers:
     subparsers = parser.add_subparsers(title='Subcommands for pav', metavar='')
     parser_annotate_and_check = pav_subparsers.annotate_and_check_parser(subparsers)
+    parser_check = pav_subparsers.check_parser(subparsers)
 
 
     # Set functions for subparsers:
     parser_annotate_and_check.set_defaults(func=annotate_and_check_main)
+    parser_check.set_defaults(func=check_main)
 
     # # Parse and return all arguments, known and unknown. Check unknown arguments:
     # arguments, unknown_arguments = parser.parse_known_args()

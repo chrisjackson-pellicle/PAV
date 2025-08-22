@@ -41,6 +41,7 @@ License: See LICENSE file
 import os
 import sys
 import gzip
+import warnings
 from collections import defaultdict
 from Bio import SeqIO
 from Bio.SeqRecord import SeqRecord
@@ -170,17 +171,7 @@ def parse_gbk_genes(gbk_file_path, fasta_file_path, logger, gene_synonyms=None):
     gene_tRNA_info = {}
     
     try:
-        # Create adjusted GenBank file object with corrected LOCUS line
-        gbk_io, _ = utils.build_adjusted_genbank_io(
-            gbk_file_path=gbk_file_path,
-            fasta_file_path=fasta_file_path,
-            logger=logger,
-        )
-        
-        # Parse GenBank file using Biopython
-        records = list(SeqIO.parse(gbk_io, "genbank"))
-        if not records:
-            raise ValueError(f"No records found in GenBank file: {gbk_file_path}")
+        records = utils.parse_genbank_file(gbk_file_path, logger)
         
         # Process each record (should be only one as I've split multi-fasta in to individual files)
         for record in records:
@@ -1083,12 +1074,7 @@ def get_ref_gene_seqrecords_from_orders(orders, gene_median_lengths, gene_synony
         
         for gbk_file in gbk_files:
             try:
-                # Parse GenBank file (handle both gzipped and uncompressed files)
-                if gbk_file.endswith('.gz'):
-                    with gzip.open(gbk_file, 'rt') as f:
-                        records = list(SeqIO.parse(f, "genbank"))
-                else:
-                    records = list(SeqIO.parse(gbk_file, "genbank"))
+                records = utils.parse_genbank_file(gbk_file, logger)
                 
                 for record in records:
                     for feature in record.features:
@@ -1236,12 +1222,7 @@ def get_ref_gene_seqrecords_from_custom_folder(refs_folder, gene_median_lengths,
     
     for gbk_file in gbk_files:
         try:
-            # Parse GenBank file (handle both gzipped and uncompressed files)
-            if gbk_file.endswith('.gz'):
-                with gzip.open(gbk_file, 'rt') as f:
-                    records = list(SeqIO.parse(f, "genbank"))
-            else:
-                records = list(SeqIO.parse(gbk_file, "genbank"))
+            records = utils.parse_genbank_file(gbk_file, logger)
             
             for record in records:
                 for feature in record.features:
@@ -1357,12 +1338,7 @@ def get_ref_gene_seqrecords_from_default(gene_median_lengths, gene_synonyms=None
     
     for gbk_file in gbk_files:
         try:
-            # Parse GenBank file (handle both gzipped and uncompressed files)
-            if gbk_file.endswith('.gz'):
-                with gzip.open(gbk_file, 'rt') as f:
-                    records = list(SeqIO.parse(f, "genbank"))
-            else:
-                records = list(SeqIO.parse(gbk_file, "genbank"))
+            records = utils.parse_genbank_file(gbk_file, logger)
             
             for record in records:
                 for feature in record.features:
@@ -2334,8 +2310,8 @@ def linearise_genome_upstream_gene(gbk_file, fasta_file, output_dir, sample_name
     """
     try:
         # Read the annotated GenBank file
-        gbk_io, adjusted_gbk_content = utils.build_adjusted_genbank_io(gbk_file, fasta_file, logger=logger)
-        record = next(SeqIO.parse(gbk_io, 'genbank'))
+        records = utils.parse_genbank_file(gbk_file, logger)
+        record = records[0]
         
         # Find the specified gene
         gene_start = None
@@ -2782,6 +2758,10 @@ def convert_gbk_to_embl(annotated_genomes_dict, output_directory, metadata_dict=
     # Create EMBL output directory
     embl_output_dir = os.path.join(output_directory, '02_embl_files')
     os.makedirs(embl_output_dir, exist_ok=True)
+
+    #Create ENA submission directory
+    ena_submission_dir = os.path.join(embl_output_dir, 'ena_submission_embl_files')
+    os.makedirs(ena_submission_dir, exist_ok=True)
     
     # Track metadata usage
     samples_with_metadata = 0
@@ -2836,7 +2816,9 @@ def convert_gbk_to_embl(annotated_genomes_dict, output_directory, metadata_dict=
         genus_species = sample_metadata['genus_species']
         linear_or_circular = sample_metadata['linear_or_circular']
             
-        # Process each file in the lists
+        # Process each file in the lists and collect ENA EMBL files for concatenation
+        ena_embl_files = []
+        
         for file_idx, (gbk_file, fasta_file) in enumerate(zip(gbk_files, fasta_files)):
             try:
                 # For multi-sequence samples, create sequence-specific names
@@ -2846,9 +2828,9 @@ def convert_gbk_to_embl(annotated_genomes_dict, output_directory, metadata_dict=
                 else:
                     embl_sample_name = sample_name
                 
-                # Read GenBank file using utils.build_adjusted_genbank_io   
-                gbk_io, adjusted_gbk_content = utils.build_adjusted_genbank_io(gbk_file, fasta_file, logger=logger)
-                record = next(SeqIO.parse(gbk_io, 'genbank'))
+                # Read GenBank file   
+                records = utils.parse_genbank_file(gbk_file, logger)
+                record = records[0]
                 record_seq_length = len(record.seq)
 
                 # Add source feature at the beginning of features list
@@ -3002,12 +2984,51 @@ def convert_gbk_to_embl(annotated_genomes_dict, output_directory, metadata_dict=
                     SeqIO.write(record, handle, 'embl')
 
                 # Convert EMBL file to ENA template format
-                convert_embl_to_ena_template(embl_filepath, sample_metadata, record_seq_length, record.id)
+                ena_embl_filepath = convert_embl_to_ena_template(embl_filepath, sample_metadata, record_seq_length, record.id, ena_submission_dir)
                 
-                logger.debug(f"{"[DEBUG]:":10} Converted {embl_sample_name} to EMBL format: {embl_filepath}")
+                # Store the ENA EMBL file path for later concatenation
+                ena_embl_files.append(ena_embl_filepath)
+                
+                logger.debug(f"{"[DEBUG]:":10} Converted {embl_sample_name} to EMBL format: {ena_embl_filepath}")
                 
             except Exception as e:
                 logger.error(f"{"[ERROR]:":10} Failed to convert {embl_sample_name if 'embl_sample_name' in locals() else sample_name} to EMBL format: {str(e)}\n{traceback.format_exc()}")
+                continue
+        
+        # Concatenate all ENA EMBL files for this sample into a single file
+        if ena_embl_files:
+            try:
+                # Create the concatenated file name
+                if len(ena_embl_files) == 1:
+                    # Single file - just rename it
+                    final_ena_embl_filepath = ena_embl_files[0]
+                else:
+                    # Multiple files - concatenate them
+                    final_ena_embl_filepath = os.path.join(ena_submission_dir, f"{sample_name}.ena.embl")
+                    
+                    with open(final_ena_embl_filepath, 'w') as outfile:
+                        for i, ena_embl_file in enumerate(ena_embl_files):
+                            # Read and write the content of each file
+                            with open(ena_embl_file, 'r') as infile:
+                                content = infile.read()
+                                outfile.write(content)
+                            
+                            # Add separator '//' between records (except after the last one)
+                            if i < len(ena_embl_files) - 1:
+                                outfile.write('//\n')
+                    
+                    # Remove individual ENA EMBL files after concatenation
+                    for ena_embl_file in ena_embl_files:
+                        try:
+                            os.remove(ena_embl_file)
+                            logger.debug(f"{"[DEBUG]:":10} Removed individual ENA EMBL file: {ena_embl_file} from {ena_submission_dir}")
+                        except Exception as e:
+                            logger.warning(f"{"[WARNING]:":10} Failed to remove individual ENA EMBL file {ena_embl_file}: {e}")
+                    
+                    logger.info(f"{"[INFO]:":10} Concatenated {len(ena_embl_files)} ENA EMBL files for {sample_name} into: {final_ena_embl_filepath}")
+                
+            except Exception as e:
+                logger.error(f"{"[ERROR]:":10} Failed to concatenate ENA EMBL files for {sample_name}: {str(e)}")
                 continue
     
     logger.info(f"{"[INFO]:":10} EMBL conversion complete. Files written to: {embl_output_dir}")
@@ -3018,7 +3039,7 @@ def convert_gbk_to_embl(annotated_genomes_dict, output_directory, metadata_dict=
     utils.log_separator(logger)
 
 
-def convert_embl_to_ena_template(embl_filepath, sample_metadata, record_seq_length, record_id):
+def convert_embl_to_ena_template(embl_filepath, sample_metadata, record_seq_length, record_id, ena_submission_dir):
     """
     Convert EMBL file to ENA template format.
     
@@ -3043,15 +3064,7 @@ def convert_embl_to_ena_template(embl_filepath, sample_metadata, record_seq_leng
         ValueError: If required metadata fields are missing
         Exception: For other processing errors
     """
-    # TODO: Implement EMBL to ENA template conversion
-    # This stub function should:
-    # 1. Read the EMBL file using BioPython
-    # 2. Extract sequence and annotation information
-    # 3. Format the data according to ENA submission requirements
-    # 4. Incorporate the provided sample metadata
-    # 5. Write the ENA template file
 
-  
     logger.debug(f"{"[DEBUG]:":10} Converting EMBL file to ENA template: {embl_filepath}")
     logger.debug(f"{"[DEBUG]:":10} Using metadata: {sample_metadata}")
 
@@ -3119,12 +3132,15 @@ def convert_embl_to_ena_template(embl_filepath, sample_metadata, record_seq_leng
     lines_to_write.extend(nucleotide_lines)
 
     # Write ENA template file
-    with open(embl_filepath.replace('.embl', '.ena.embl'), 'w') as handle:
+    base_name = os.path.basename(embl_filepath)
+    ena_template_filepath = os.path.join(ena_submission_dir, base_name.replace('.embl', '.ena.embl'))
+    with open(ena_template_filepath, 'w') as handle:
         for line in lines_to_write:
             handle.write(line + '\n')   
 
-    logger.debug(f"{"[DEBUG]:":10} ENA template file written to: {embl_filepath.replace('.embl', '.ena.embl')}")
-    logger.debug(f"{"[DEBUG]:":10} ENA template file written to: {embl_filepath.replace('.embl', '.ena.embl')}")
+    logger.debug(f"{"[DEBUG]:":10} ENA template file written to: {ena_template_filepath}")
+    
+    return ena_template_filepath
    
     
 def query_intergenic_regions(annotated_genomes_dict, output_directory, min_intergenic_length=50, blast_evalue=1e-10, 
@@ -3320,13 +3336,8 @@ def extract_intergenic_regions(gbk_file, fasta_file, min_length=50, debug_interg
     intergenic_regions = []
     
     # Parse GenBank file
-    gbk_io, adjusted_gbk_content = utils.build_adjusted_genbank_io(
-        gbk_file_path=gbk_file,
-        fasta_file_path=fasta_file,
-        logger=logger,
-    )
-
-    record = SeqIO.read(gbk_io, "genbank")
+    records = utils.parse_genbank_file(gbk_file, logger)
+    record = records[0]
     
     # Get features with locations, but exclude features that are parts of genes or structural regions
     # We want intergenic regions between genes and within genes (introns)
@@ -3947,6 +3958,251 @@ def parse_metadata_tsv(metadata_file_path, genome_fasta_dir, ):
         utils.exit_program()
 
 
+def load_annotated_genbank_files(genbank_dir, metadata_dict, logger):
+    """
+    Load already annotated GenBank files into the annotated_genomes_dict structure.
+    
+    Args:
+        genbank_dir (str): Directory containing annotated GenBank files
+        metadata_dict (dict): Dictionary containing metadata for each sample
+        logger: Logger instance for logging messages
+        
+    Returns:
+        dict: Dictionary with sample names as keys and dicts containing file paths as values,
+              matching the structure returned by annotate_genomes()
+    """
+    
+    annotated_genomes_dict = {}
+    
+    # Check if directory exists
+    if not os.path.exists(genbank_dir):
+        logger.error(f"{"[ERROR]:":10} GenBank directory does not exist: {genbank_dir}")
+        utils.exit_program()
+    
+    # Create output directory for individual files
+    output_dir = os.path.join(os.path.dirname(genbank_dir), "01_gbk_and_fasta")
+    os.makedirs(output_dir, exist_ok=True)
+    logger.info(f"{"[INFO]:":10} Created output directory: {output_dir}")
+    
+    # Get all .gb and .gbk files in the directory
+    genbank_files = []
+    for ext in ['*.gb', '*.gbk', '*.gb.gz', '*.gbk.gz']:
+        genbank_files.extend(glob.glob(os.path.join(genbank_dir, ext)))
+    
+    if not genbank_files:
+        logger.error(f"{"[ERROR]:":10} No GenBank files (.gb, .gbk, .gb.gz, or .gbk.gz) found in directory: {genbank_dir}")
+        utils.exit_program()
+    
+    logger.info(f"{"[INFO]:":10} Found {len(genbank_files)} GenBank files")
+    
+    # Process each GenBank file and split multi-record files
+    sample_files = {}
+    for gbk_file in genbank_files:
+        try:
+            # Extract sample name from filename (remove .gz and GenBank extensions)
+            base_filename = os.path.basename(gbk_file)
+            if base_filename.endswith('.gz'):
+                # Remove .gz first, then remove GenBank extension
+                sample_name = os.path.splitext(os.path.splitext(base_filename)[0])[0]
+            else:
+                # Just remove GenBank extension
+                sample_name = os.path.splitext(base_filename)[0]
+            
+            # Initialize sample in dictionary if not present
+            if sample_name not in sample_files:
+                sample_files[sample_name] = {'gbk': [], 'fasta': []}
+            
+            # Parse the GenBank file (may contain multiple records)
+            # Parse GenBank file using utility function with warning filtering
+            seq_records = utils.parse_genbank_file(gbk_file, logger)
+
+
+            if not seq_records:
+                logger.warning(f"{"[WARNING]:":10} No sequences found in {gbk_file}")
+                continue
+            
+            # If single record, use original file
+            if len(seq_records) == 1:
+                sample_files[sample_name]['gbk'].append(gbk_file)
+                
+                # Look for corresponding FASTA file
+                fasta_file = None
+                for ext in ['.fasta', '.fa', '.fas']:
+                    potential_fasta = gbk_file.replace('.gb', ext).replace('.gbk', ext)
+                    if potential_fasta.endswith('.gz'):
+                        potential_fasta = potential_fasta[:-3]  # Remove .gz
+                    if os.path.exists(potential_fasta):
+                        fasta_file = potential_fasta
+                        break
+                
+                if fasta_file:
+                    sample_files[sample_name]['fasta'].append(fasta_file)
+                else:
+                    logger.warning(f"{"[WARNING]:":10} No corresponding FASTA file found for {gbk_file}")
+            
+            else:
+                # Multiple records - split into individual files
+                logger.info(f"{"[INFO]:":10} Splitting {len(seq_records)} records from {base_filename}")
+                
+                for i, record in enumerate(seq_records, 1):
+                    # Create individual GenBank file
+                    individual_gbk_name = f"{sample_name}_seq{i:03d}.gb"
+                    individual_gbk_path = os.path.join(output_dir, individual_gbk_name)
+                    
+                    # Write individual GenBank record
+                    SeqIO.write(record, individual_gbk_path, 'genbank')
+                    
+                    # Create individual FASTA file
+                    individual_fasta_name = f"{sample_name}_seq{i:03d}.fasta"
+                    individual_fasta_path = os.path.join(output_dir, individual_fasta_name)
+                    
+                    # Write individual FASTA record
+                    SeqIO.write(record, individual_fasta_path, 'fasta')
+                    
+                    # Add to sample files
+                    sample_files[sample_name]['gbk'].append(individual_gbk_path)
+                    sample_files[sample_name]['fasta'].append(individual_fasta_path)
+                    
+                    logger.debug(f"{"[DEBUG]:":10} Created {individual_gbk_name} and {individual_fasta_name}")
+                    
+        except Exception as e:
+            logger.error(f"{"[ERROR]:":10} Error processing GenBank file {gbk_file}: {e}")
+            utils.log_manager.handle_error(e, traceback.format_exc(), "load_annotated_genbank_files()")
+    
+    # Convert to the expected structure
+    for sample_name, files in sample_files.items():
+        gbk_files = files['gbk']
+        fasta_files = files['fasta']
+        
+        # Determine if this is a multi-sequence sample
+        is_multi_sequence = len(gbk_files) > 1
+        sequence_count = len(gbk_files)
+        
+        # Create the sample data structure matching annotate_genomes() output
+        sample_data = {
+            'original_fasta': f"{sample_name}.fasta",  # Placeholder since we don't have original fasta
+            'is_multi_sequence': is_multi_sequence,
+            'sequence_count': sequence_count
+        }
+        
+        # Add file paths (convert to single path if only one file, keep as list if multiple)
+        if len(gbk_files) == 1:
+            sample_data['gbk'] = gbk_files[0]
+            sample_data['fasta'] = fasta_files[0] if fasta_files else None
+        else:
+            sample_data['gbk'] = gbk_files
+            sample_data['fasta'] = fasta_files if fasta_files else []
+        
+        annotated_genomes_dict[sample_name] = sample_data
+        logger.info(f"{"[INFO]:":10} Loaded {sequence_count} sequences for {sample_name}")
+    
+    # Validate that all GenBank files have corresponding metadata entries
+    # Normalize metadata sample names by stripping .gz and GenBank extensions
+    def _normalize_name(name: str) -> str:
+        base = name[:-3] if name.endswith('.gz') else name
+        # Remove one extension layer (e.g., .gb or .gbk)
+        root, ext = os.path.splitext(base)
+        if ext.lower() in {'.gb', '.gbk'}:
+            return root
+        return base
+
+    normalized_metadata_names = { _normalize_name(n) for n in metadata_dict.keys() }
+
+    missing_metadata = []
+    for sample_name in annotated_genomes_dict.keys():
+        if sample_name not in normalized_metadata_names:
+            missing_metadata.append(sample_name)
+    
+    if missing_metadata:
+        logger.error(f"{"[ERROR]:":10} Missing metadata entries for GenBank files: {', '.join(missing_metadata)}")
+        utils.exit_program()
+    
+    logger.info(f"{"[INFO]:":10} Successfully loaded {len(annotated_genomes_dict)} samples with annotated GenBank files")
+    
+    return annotated_genomes_dict
+
+
+def check_pipeline(args):
+    """Continue pipeline from annotated GenBank files.
+    Args:
+        args (argparse.Namespace): Parsed command line arguments containing input file paths
+            and other configuration options.
+
+    Returns:
+        None: No return value specified.
+
+    Raises:
+        SystemExit: If input files or directories do not exist.
+    """
+
+    print(f'{"[INFO]:":10} Subcommand `check` not implemented yet!')
+    return
+
+    # Track wall-clock runtime for completion message
+    start_time = time.time()
+
+    try:
+        global logger, log_queue, log_listener
+
+        # Set up global logger
+        logger, log_queue, log_listener = utils.log_manager.setup(
+            __name__, 'check', log_directory=args.log_directory
+        )
+
+        # Print arguments to screen and log:
+        utils.print_arguments(args, logger, __version__)
+
+        # Check for external dependencies:
+        utils.check_dependencies(logger)
+
+        # Load gene median lengths from package resources
+        gene_median_lengths = load_gene_median_lengths()
+
+        # Load gene synonyms from package resources
+        gene_synonyms = load_gene_synonyms()
+
+        # Check no_alignment and refs_order
+        ref_gene_seqrecords = get_references(args, gene_median_lengths, gene_synonyms)
+
+        # Parse required metadata TSV file
+        metadata_dict = parse_metadata_tsv(args.metadata_tsv, args.annotated_genbank_dir)
+
+        # Load annotated GenBank files
+        annotated_genomes_dict = load_annotated_genbank_files(args.annotated_genbank_dir, metadata_dict, logger)
+
+        # Check genes and write reports
+        all_sample_results = check_genes(gene_median_lengths, annotated_genomes_dict, args.min_length_percentage,
+                                         args.max_length_percentage, args.report_directory, log_queue, args.pool,
+                                         gene_synonyms)
+
+        # # Convert assembly gbk files to embl format
+        # convert_gbk_to_embl(annotated_genomes_dict, args.output_directory, metadata_dict=metadata_dict)
+
+        # # Generate alignments if not disabled
+        # if not args.no_alignment:
+        #     align_genes(all_sample_results, ref_gene_seqrecords, args.output_directory, args.pool, args.threads,
+        #                 args.refs_order)
+
+        # # Query intergenic regions
+        # if not args.skip_intergenic_analysis:
+        #     query_intergenic_regions(annotated_genomes_dict, args.output_directory, args.min_intergenic_length,
+        #                              args.blast_evalue, args.debug_intergenic, args.max_blast_hits, args.pool,
+        #                              args.threads, log_queue)
+        # else:
+        #     logger.info(f"{"[INFO]:":10} Skipping intergenic region analysis as requested")
+ 
+    except Exception as e:
+        utils.log_manager.handle_error(e, traceback.format_exc(), "check_pipeline()")
+
+    finally:
+        # Log total completion time before cleaning up the logger
+        utils.log_separator(logger)
+        utils.log_completion_time(start_time, logger if ('logger' in globals() and logger) else None,
+                                  label="PAV subcommand `check` completed")
+
+        utils.log_manager.cleanup()
+
+
 def main(args):
     """Add sequences to an existing target file.
     Args:
@@ -3989,7 +4245,7 @@ def main(args):
         # Parse required metadata TSV file
         metadata_dict = parse_metadata_tsv(args.metadata_tsv, args.genome_fasta_dir)
 
-        # Annotate the genomes using chloë, honoring optional user-specified chloe paths
+        # Annotate the genomes using chloë, honouring optional user-specified chloe paths
         annotated_genomes_dict = annotate_genomes(
             args.genome_fasta_dir,
             args.output_directory,
@@ -4032,4 +4288,5 @@ def main(args):
                                   label="PAV subcommand `annotate_and_check` completed")
 
         utils.log_manager.cleanup()
+
         

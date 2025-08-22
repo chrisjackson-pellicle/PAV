@@ -14,6 +14,7 @@ import re
 import threading
 from multiprocessing import Manager
 import time
+import gzip
 
 
 
@@ -346,7 +347,7 @@ def check_dependencies(logger):
     """Checks for the presence of required external executables.
 
     Args:
-        logger (logging.Logger): Logger object.
+        Nil.
 
     Returns:
         bool: True if all dependencies are found, False otherwise.
@@ -535,7 +536,6 @@ def build_adjusted_genbank_io(gbk_file_path, fasta_file_path, logger=None):
     # Read and adjust GenBank LOCUS line (preserve original spacing except for required tweaks)
     # Handle both gzipped and uncompressed files
     if gbk_file_path.endswith('.gz'):
-        import gzip
         with gzip.open(gbk_file_path, 'rt') as gbk_handle:
             gbk_lines = gbk_handle.readlines()
     else:
@@ -601,6 +601,65 @@ def log_separator(logger, length=100):
         length (int): Length of the separator line (default: 100)
     """
     logger.info(f"{"":10} {'-'*length}")
+
+
+def parse_genbank_file(gbk_file_path, logger=None):
+    """
+    Open and parse a GenBank file (zipped or unzipped) with warning filtering.
+    
+    This function handles both compressed (.gz) and uncompressed GenBank files,
+    automatically detecting the file type and applying appropriate warning filters
+    to suppress Biopython parser warnings about malformed locus lines and
+    sequence length mismatches.
+    
+    Args:
+        gbk_file_path (str): Path to the GenBank file (.gb, .gbk, .gb.gz, .gbk.gz)
+        logger (logging.Logger, optional): Logger instance for messages and warnings
+        
+    Returns:
+        list: List of Bio.SeqRecord.SeqRecord objects from the GenBank file
+        
+    Raises:
+        FileNotFoundError: If the GenBank file doesn't exist
+        ValueError: If the GenBank file is empty or contains no valid records
+        Exception: For other parsing errors
+    """
+    import warnings
+    
+    # Check if file exists
+    if not os.path.exists(gbk_file_path):
+        raise FileNotFoundError(f"GenBank file not found: {gbk_file_path}")
+    
+    try:
+        # Parse GenBank file with warning filtering
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", UserWarning)
+            warnings.filterwarnings("ignore", message=".*malformed locus line.*")
+            warnings.filterwarnings("ignore", message=".*Expected sequence length.*")
+            warnings.filterwarnings("ignore", message=".*Attempting to parse malformed locus line.*")
+            warnings.filterwarnings("ignore", message=".*Some fields may be wrong.*")
+            
+            if gbk_file_path.endswith('.gz'):
+                with gzip.open(gbk_file_path, 'rt') as handle:
+                    records = list(SeqIO.parse(handle, 'genbank'))
+            else:
+                with open(gbk_file_path, 'r') as handle:
+                    records = list(SeqIO.parse(handle, 'genbank'))
+        
+        if not records:
+            if logger:
+                logger.warning(f"{'[WARNING]:':10} No sequences found in GenBank file: {gbk_file_path}")
+            raise ValueError(f"No sequences found in GenBank file: {gbk_file_path}")
+        
+        if logger:
+            logger.debug(f"{'[DEBUG]:':10} Successfully parsed {len(records)} records from {gbk_file_path}")
+        
+        return records
+        
+    except Exception as e:
+        if logger:
+            logger.error(f"{'[ERROR]:':10} Error parsing GenBank file {gbk_file_path}: {e}")
+        raise
 
 
 def exit_program():
