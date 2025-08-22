@@ -243,15 +243,15 @@ output_dir/
 │       └── <sample_name>_gene_validation_report.tsv    # Per-sample reports
 ├── 01_annotated_genomes/
 │   └── sample_name/
-│       ├── <prefix>.chloe.original.gbk          # Original annotation (preserved)
-│       ├── <prefix>.chloe.original.gff          # Original GFF (preserved)
-│       ├── <prefix>_linearized.chloe.gbk        # Re-annotated after linearization
-│       ├── <prefix>_linearized.chloe.gff        # Re-annotated after linearization
-│       └── <prefix>_linearized.fasta            # Linearized sequence
-│       └── <prefix>_linearized.chloe_intergenic_debug.fasta   # Optional (when --debug_intergenic)
+│       ├── <prefix>.round1.chloe.gbk            # Original annotation (preserved)
+│       ├── <prefix>.round1.chloe.gff            # Original GFF (preserved)
+│       ├── <prefix>.round2.chloe.gbk            # Re-annotated after linearization
+│       ├── <prefix>.round2.chloe.gff            # Re-annotated after linearization
+│       └── <prefix>.round2.fasta                # Linearized sequence
+│       └── <prefix>.round2.chloe_intergenic_debug.fasta   # Optional (when --debug_intergenic)
 │       └── <prefix>_seq001_<seqname>.fasta      # Individual sequences (multi-sequence files only)
-│       └── <prefix>_seq001_<seqname>.chloe.gbk  # Individual sequence annotations
-│       └── <prefix>_seq001_<seqname>.chloe.gff  # Individual sequence GFF files
+│       └── <prefix>_seq001_<seqname>.round1.chloe.gbk  # Individual sequence annotations
+│       └── <prefix>_seq001_<seqname>.round1.chloe.gff  # Individual sequence GFF files
 ├── 02_embl_files/
 │   ├── <sample_name>.embl                        # EMBL format
 │   └── <sample_name>.ena.embl                    # ENA template (derived from EMBL)
