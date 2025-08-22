@@ -107,7 +107,8 @@ def load_gene_median_lengths():
         
     """
 
-    with importlib.resources.open_text('plastid_annotation_validator.data', 'plDNA_genes_median_lengths.csv') as csv_file:
+    with importlib.resources.open_text('plastid_annotation_validator.data',
+                                       'plDNA_genes_median_lengths.csv') as csv_file:
         gene_lengths_df = pd.read_csv(csv_file)
 
     logger.debug(f"{"[DEBUG]:":10} Successfully loaded reference gene median lengths from package resources")
@@ -196,7 +197,7 @@ def parse_gbk_genes(gbk_file_path, fasta_file_path, logger, gene_synonyms=None):
                     continue
                     
                 # Extract gene name from qualifiers
-                gene_name = _extract_gene_name(feature)
+                gene_name = extract_gene_name(feature)
                 if not gene_name:
                     raise ValueError(f"No gene name found for feature: {feature}")
                 
@@ -213,8 +214,10 @@ def parse_gbk_genes(gbk_file_path, fasta_file_path, logger, gene_synonyms=None):
                 # Check for length mismatch between feature location and extracted sequence
                 length_mismatch_msg = None
                 if gene_length != len(extracted_seq):
-                    logger.debug(f"{"[DEBUG]:":10} Gene {mapped_gene_name} length mismatch: Expected {gene_length} != Extracted {len(extracted_seq)}")
-                    length_mismatch_msg = f"Gene {mapped_gene_name} length mismatch: Expected {gene_length} != Extracted {len(extracted_seq)}"
+                    logger.debug(f"{"[DEBUG]:":10} Gene {mapped_gene_name} length mismatch: Expected {gene_length} "
+                                 f"!= Extracted {len(extracted_seq)}")
+                    length_mismatch_msg = (f"Gene {mapped_gene_name} length mismatch: Expected {gene_length} "
+                                           f"!= Extracted {len(extracted_seq)}")
                 
                 # Store gene length information
                 gene_lengths[mapped_gene_name].append(gene_length)
@@ -300,7 +303,7 @@ def parse_gbk_genes(gbk_file_path, fasta_file_path, logger, gene_synonyms=None):
         raise
 
 
-def _extract_gene_name(feature):
+def extract_gene_name(feature):
     """
     Extract gene name from a Biopython feature's qualifiers.
     
@@ -379,7 +382,8 @@ def check_gene_translation(gene_name, cds_info_list, logger):
         raise e
 
 
-def check_single_sample_genes(sample_data, gene_median_lengths, min_threshold, max_threshold, gene_synonyms=None, log_queue=None):
+def check_single_sample_genes(sample_data, gene_median_lengths, min_threshold, max_threshold, gene_synonyms=None,
+                              log_queue=None):
     """
     Validate gene annotations for a single plastid genome sample by checking gene lengths and translation quality.
     
@@ -461,7 +465,8 @@ def check_single_sample_genes(sample_data, gene_median_lengths, min_threshold, m
         # Process each file for a sample and combine the results
         for gbk_file, fasta_file in zip(gbk_files, fasta_files):
             # Parse gene lengths and CDS information from GenBank file (adjusted in-memory)
-            gene_data, gene_cds_info, gene_rRNA_info, gene_tRNA_info = parse_gbk_genes(gbk_file, fasta_file, worker_logger, gene_synonyms)
+            gene_data, gene_cds_info, gene_rRNA_info, gene_tRNA_info = parse_gbk_genes(gbk_file, fasta_file,
+                                                                                       worker_logger, gene_synonyms)
 
             # Store individual sequence data for reporting
             seq_filename = os.path.basename(gbk_file)
@@ -537,9 +542,11 @@ def check_single_sample_genes(sample_data, gene_median_lengths, min_threshold, m
         genes_in_median_not_in_lengths = list(set(gene_median_lengths.keys()) - all_gene_names_no_copy_suffix)
         
         if genes_in_lengths_not_in_median:
-            worker_logger.debug(f"{"[DEBUG]:":10} Genes in sample {sample_name} but not in median lengths: {genes_in_lengths_not_in_median}...")
+            worker_logger.debug(f"{"[DEBUG]:":10} Genes in sample {sample_name} but not in median lengths: "
+                                f"{genes_in_lengths_not_in_median}...")
         if genes_in_median_not_in_lengths:
-            worker_logger.debug(f"{"[DEBUG]:":10} Genes in median lengths but not in sample {sample_name}: {genes_in_median_not_in_lengths}...")
+            worker_logger.debug(f"{"[DEBUG]:":10} Genes in median lengths but not in sample {sample_name}: "
+                                f"{genes_in_median_not_in_lengths}...")
        
         # Check each gene copy against median lengths and translation
         for seq_name, seq_data in sequence_gene_data.items():
@@ -560,14 +567,16 @@ def check_single_sample_genes(sample_data, gene_median_lengths, min_threshold, m
        
                     # Check if gene is too short
                     if annotated_gene_length < min_expected:
-                        warning_msg = f"Too short: {annotated_gene_length} bp < {min_expected:.0f} bp ({min_threshold*100}% of ref median)"
+                        warning_msg = (f"Too short: {annotated_gene_length} bp < {min_expected:.0f} bp "
+                                       f"({min_threshold*100}% of ref median)")
                         gene_info['issue'] = 'too_short'
                         gene_info['details'] = warning_msg
                         length_warnings.add(gene_name)
 
                     # Check if gene is too long
                     elif annotated_gene_length > max_expected:
-                        warning_msg = f"Too long: {annotated_gene_length} bp > {max_expected:.0f} bp ({max_threshold*100}% of median)"
+                        warning_msg = (f"Too long: {annotated_gene_length} bp > {max_expected:.0f} bp "
+                                       f"({max_threshold*100}% of median)")
                         gene_info['issue'] = 'too_long'
                         gene_info['details'] = warning_msg
                         length_warnings.add(gene_name)
@@ -700,7 +709,8 @@ def check_genes(gene_median_lengths, annotated_genomes_dict, min_threshold, max_
         }
         
         # Process results with progress bar
-        for future in tqdm(as_completed(future_to_sample), total=len(future_to_sample), desc=f"{"[INFO]:":10} {"Validating genes":<20}", file=sys.stdout):
+        for future in tqdm(as_completed(future_to_sample), total=len(future_to_sample),
+                           desc=f"{"[INFO]:":10} {"Validating genes":<20}", file=sys.stdout):
             sample_name = future_to_sample[future]
 
             success, result = future.result()
@@ -714,7 +724,8 @@ def check_genes(gene_median_lengths, annotated_genomes_dict, min_threshold, max_
                 utils.log_manager.handle_error(result[0], result[1], "check_genes()", sample_name)
 
     # Generate and write report
-    write_gene_length_report(all_sample_results, logger, min_threshold, max_threshold, report_directory, gene_median_lengths)
+    write_gene_length_report(all_sample_results, logger, min_threshold, max_threshold, report_directory,
+                             gene_median_lengths)
     
     utils.log_separator(logger)
 
@@ -835,7 +846,8 @@ def write_gene_length_report(all_results, logger, min_threshold, max_threshold, 
         
         # Count total genes across all sequences
         total_genes_count = sum(len(seq_data['sequence_gene_data']) for seq_data in sequence_gene_data.values())
-        logger.debug(f"{"[DEBUG]:":10} Processing {sample_name}: found {total_genes_count} genes across {len(sequence_gene_data)} sequences")
+        logger.debug(f"{"[DEBUG]:":10} Processing {sample_name}: found {total_genes_count} genes across "
+                     f"{len(sequence_gene_data)} sequences")
         
         # Prepare individual sample report
         sample_tsv_lines = ['\t'.join(create_tsv_header())]
@@ -879,7 +891,8 @@ def write_gene_length_report(all_results, logger, min_threshold, max_threshold, 
         with open(sample_report_file, 'w') as f:
             f.write('\n'.join(sample_tsv_lines))
         
-        logger.info(f"{" ":15} Sample {sample_name}: ({len(sample_tsv_lines)-1} genes, {warnings_found} warnings, {missing_genes_count} missing genes)")
+        logger.info(f"{" ":15} Sample {sample_name}: ({len(sample_tsv_lines)-1} genes, {warnings_found} warnings, "
+                    f"{missing_genes_count} missing genes)")
     
     logger.info(f"")
     
@@ -889,7 +902,7 @@ def write_gene_length_report(all_results, logger, min_threshold, max_threshold, 
         f.write('\n'.join(combined_tsv_lines))
 
 
-def check_no_alignment_and_refs_order(args, gene_median_lengths, gene_synonyms=None):
+def get_references(args, gene_median_lengths, gene_synonyms=None):
     """
     Check alignment settings and get reference sequences from appropriate sources.
     
@@ -911,7 +924,8 @@ def check_no_alignment_and_refs_order(args, gene_median_lengths, gene_synonyms=N
     if args.refs_order:
         # If refs_order is specified, no_alignment must be False
         if args.no_alignment:
-            logger.error(f"{"[ERROR]:":10} Cannot specify --refs_order when --no_alignment is True. Please remove --no_alignment or remove --refs_order.")
+            logger.error(f"{"[ERROR]:":10} Cannot specify --refs_order when --no_alignment is True. Please remove "
+                         f"--no_alignment or remove --refs_order.")
             utils.exit_program()
         
         # Get available order directories
@@ -945,12 +959,14 @@ def check_no_alignment_and_refs_order(args, gene_median_lengths, gene_synonyms=N
     if args.custom_refs_folder:
         # If custom folder is specified, no_alignment must be False
         if args.no_alignment:
-            logger.error(f"{"[ERROR]:":10} Cannot specify --custom_refs_folder when --no_alignment is True. Please remove --no_alignment or remove --custom_refs_folder.")
+            logger.error(f"{"[ERROR]:":10} Cannot specify --custom_refs_folder when --no_alignment is True. Please "
+                         f"remove --no_alignment or remove --custom_refs_folder.")
             utils.exit_program()
         
         try:
             logger.info(f"{"[INFO]:":10} Using custom reference genomes from: {args.custom_refs_folder}")
-            custom_refs = get_ref_gene_seqrecords_from_custom_folder(args.custom_refs_folder, gene_median_lengths, gene_synonyms)
+            custom_refs = get_ref_gene_seqrecords_from_custom_folder(args.custom_refs_folder, gene_median_lengths,
+                                                                     gene_synonyms)
         except Exception as e:
             logger.error(f"{"[ERROR]:":10} Error processing custom reference folder: {e}")
             utils.exit_program()
@@ -1147,7 +1163,8 @@ def get_ref_gene_seqrecords_from_orders(orders, gene_median_lengths, gene_synony
     # Log summary
     total_genes = len(ref_cds_seqrecords)
     total_sequences = sum(len(seqrecords) for seqrecords in ref_cds_seqrecords.values())
-    logger.debug(f"{"[DEBUG]:":10} Extracted {total_sequences} gene sequences for {total_genes} unique genes from order-specific GenBank files")
+    logger.debug(f"{"[DEBUG]:":10} Extracted {total_sequences} gene sequences for {total_genes} unique genes from "
+                 f"order-specific GenBank files")
     
     return ref_cds_seqrecords
 
@@ -2522,8 +2539,8 @@ def process_single_sequence(fasta_file, output_dir, sequence_name, chloe_project
         }
 
 
-def annotate_genomes(genome_fasta_dir, output_directory, chloe_project_dir=None, chloe_script_path=None, linearise_gene='psbA', 
-                     metadata_dict=None, pool_size=1, log_queue=None):
+def annotate_genomes(genome_fasta_dir, output_directory, chloe_project_dir=None, chloe_script_path=None,
+                     linearise_gene='psbA',  metadata_dict=None, pool_size=1, log_queue=None):
     """
     Annotate genome fasta files using chloe annotate command.
     
@@ -2579,13 +2596,14 @@ def annotate_genomes(genome_fasta_dir, output_directory, chloe_project_dir=None,
     with ProcessPoolExecutor(max_workers=pool_size) as executor:
         # Submit all tasks
         future_to_file = {
-            executor.submit(process_single_fasta_file, fasta_file, annotated_genomes_dir, chloe_project_dir, chloe_script_path, 
-                            linearise_gene, metadata_dict, log_queue): fasta_file
+            executor.submit(process_single_fasta_file, fasta_file, annotated_genomes_dir, chloe_project_dir,
+                            chloe_script_path, linearise_gene, metadata_dict, log_queue): fasta_file
             for fasta_file in fasta_files
         }
         
         # Process results with progress bar
-        for future in tqdm(as_completed(future_to_file), total=len(future_to_file), desc=f"{"[INFO]:":10} {"Annotating genomes":<20}", file=sys.stdout):
+        for future in tqdm(as_completed(future_to_file), total=len(future_to_file),
+                           desc=f"{"[INFO]:":10} {"Annotating genomes":<20}", file=sys.stdout):
             fasta_file = future_to_file[future]
             
             success, result = future.result()
@@ -2603,7 +2621,8 @@ def annotate_genomes(genome_fasta_dir, output_directory, chloe_project_dir=None,
     return annotated_genomes
 
 
-def process_single_fasta_file(fasta_file, annotated_genomes_dir, chloe_project_dir, chloe_script_path, linearise_gene, metadata_dict, log_queue=None):
+def process_single_fasta_file(fasta_file, annotated_genomes_dir, chloe_project_dir, chloe_script_path, linearise_gene,
+                              metadata_dict, log_queue=None):
     """
     Process a single FASTA file with annotation (worker function for multiprocessing).
     
@@ -2647,7 +2666,8 @@ def process_single_fasta_file(fasta_file, annotated_genomes_dir, chloe_project_d
             os.makedirs(output_sample_dir, exist_ok=True)
             
             # Split the multi-sequence FASTA into individual files
-            individual_sequence_files = split_multi_sequence_fasta(fasta_file, output_sample_dir, filename_prefix, worker_logger)
+            individual_sequence_files = split_multi_sequence_fasta(fasta_file, output_sample_dir, filename_prefix,
+                                                                   worker_logger)
             
             if not individual_sequence_files:
                 worker_logger.error(f"{"[ERROR]:":10} Failed to split multi-sequence FASTA file: {basename}")
@@ -3772,7 +3792,7 @@ def write_blast_report(blast_results, output_file, sample_name, logger):
         
  
 
-def parse_metadata_tsv(metadata_file_path, genome_fasta_dir, logger):
+def parse_metadata_tsv(metadata_file_path, genome_fasta_dir, ):
     """
     Parse and validate the metadata TSV file for EMBL conversion.
     
@@ -3785,7 +3805,6 @@ def parse_metadata_tsv(metadata_file_path, genome_fasta_dir, logger):
     Args:
         metadata_file_path (str): Path to the metadata TSV file
         genome_fasta_dir (str): Path to directory containing genome fasta files
-        logger: Logger instance for logging messages and errors
         
     Returns:
         dict: Dictionary mapping fasta_filename to metadata dictionary containing:
@@ -3882,7 +3901,8 @@ def parse_metadata_tsv(metadata_file_path, genome_fasta_dir, logger):
                 if fasta_filename not in metadata_dict:
                     missing_from_metadata.append(fasta_filename)
             
-            logger.info(f"{"[INFO]:":10} Metadata coverage: {len(expected_fasta_files) - len(missing_from_metadata)}/{len(expected_fasta_files)} samples")
+            logger.info(f"{"[INFO]:":10} Metadata coverage: "
+                        f"{len(expected_fasta_files) - len(missing_from_metadata)}/{len(expected_fasta_files)} samples")
             
             if missing_from_metadata:
                 logger.error(f"{"[ERROR]:":10} ALL samples must be present in metadata file!")
@@ -3936,7 +3956,7 @@ def main(args):
         utils.print_arguments(args, logger, __version__)
 
         # Check for external dependencies:
-        utils.check_dependencies(logger) 
+        utils.check_dependencies(logger)
 
         # Load gene median lengths from package resources
         gene_median_lengths = load_gene_median_lengths()
@@ -3945,39 +3965,43 @@ def main(args):
         gene_synonyms = load_gene_synonyms()
 
         # Check no_alignment and refs_order
-        ref_gene_seqrecords = check_no_alignment_and_refs_order(args, gene_median_lengths, gene_synonyms)
+        ref_gene_seqrecords = get_references(args, gene_median_lengths, gene_synonyms)
 
         # Parse required metadata TSV file
-        metadata_dict = parse_metadata_tsv(args.metadata_tsv, args.genome_fasta_dir, logger)
- 
+        metadata_dict = parse_metadata_tsv(args.metadata_tsv, args.genome_fasta_dir)
+
         # Annotate the genomes using chloë, honoring optional user-specified chloe paths
         annotated_genomes_dict = annotate_genomes(
             args.genome_fasta_dir,
             args.output_directory,
-            getattr(args, 'chloe_project_dir', None),
-            getattr(args, 'chloe_script', None),
-            getattr(args, 'linearise_gene', 'psbA'),
+            args.chloe_project_dir,
+            args.chloe_script,
+            args.linearise_gene,
             metadata_dict,
             args.pool,
             log_queue
         )
 
         # Check genes and write reports
-        all_sample_results = check_genes(gene_median_lengths, annotated_genomes_dict, args.min_length_percentage, args.max_length_percentage, 
-                                         args.report_directory, log_queue, args.pool, gene_synonyms)
+        all_sample_results = check_genes(gene_median_lengths, annotated_genomes_dict, args.min_length_percentage,
+                                         args.max_length_percentage, args.report_directory, log_queue, args.pool,
+                                         gene_synonyms)
 
         # Convert assembly gbk files to embl format
         convert_gbk_to_embl(annotated_genomes_dict, args.output_directory, metadata_dict=metadata_dict)
 
         # Generate alignments if not disabled
         if not args.no_alignment:
-            align_genes(all_sample_results, ref_gene_seqrecords, args.output_directory, args.pool, args.threads, args.refs_order)
+            align_genes(all_sample_results, ref_gene_seqrecords, args.output_directory, args.pool, args.threads,
+                        args.refs_order)
 
         # Query intergenic regions
         if not args.skip_intergenic_analysis:
-            query_intergenic_regions(annotated_genomes_dict, args.output_directory, args.min_intergenic_length, args.blast_evalue, args.debug_intergenic, args.max_blast_hits, args.pool, args.threads, log_queue)
+            query_intergenic_regions(annotated_genomes_dict, args.output_directory, args.min_intergenic_length,
+                                     args.blast_evalue, args.debug_intergenic, args.max_blast_hits, args.pool,
+                                     args.threads, log_queue)
         else:
-            logger.info(f"{"[INFO]:":10} Skipping intergenic region analysis as requested") 
+            logger.info(f"{"[INFO]:":10} Skipping intergenic region analysis as requested")
  
     except Exception as e:
         utils.log_manager.handle_error(e, traceback.format_exc(), "main()")
@@ -3985,7 +4009,8 @@ def main(args):
     finally:
         # Log total completion time before cleaning up the logger
         utils.log_separator(logger)
-        utils.log_completion_time(start_time, logger if ('logger' in globals() and logger) else None, label="PAV subcommand `annotate_and_check` completed")
+        utils.log_completion_time(start_time, logger if ('logger' in globals() and logger) else None,
+                                  label="PAV subcommand `annotate_and_check` completed")
 
         utils.log_manager.cleanup()
         

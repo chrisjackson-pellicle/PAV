@@ -333,7 +333,8 @@ def print_arguments(args, logger, __version__):
         __version__ (str): Version of the script.
     """
 
-    logger.info(f'{"[INFO]:":10} Plastid Annotation Validator (PAV) version {__version__} subcommand `{args.subcommand_name}` was called with these arguments:\n')
+    logger.info(f'{"[INFO]:":10} Plastid Annotation Validator (PAV) version {__version__} subcommand '
+                f'`{args.subcommand_name}` was called with these arguments:\n')
 
     for parameter, value in args.__dict__.items():
         if parameter not in ['func', 'logger', 'log_directory', 'report_directory', 'subcommand_name']:
@@ -345,13 +346,12 @@ def check_dependencies(logger):
     """Checks for the presence of required external executables.
 
     Args:
-        logger (logging.Logger): Logger object for output.
-        log_listener (QueueListener): QueueListener object for logging
+        logger (logging.Logger): Logger object.
 
     Returns:
         bool: True if all dependencies are found, False otherwise.
     """
-    executables = ['mafft', 'trimal', 'blastn']
+    executables = ['mafft', 'trimal', 'blastn', 'julia']
 
     logger.info(f'{"[INFO]:":10} Checking for external dependencies:\n')
 

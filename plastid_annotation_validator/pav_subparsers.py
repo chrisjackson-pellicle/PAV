@@ -54,12 +54,14 @@ def annotate_and_check_parser(subparsers):
                                 dest='no_alignment',
                                 help='Do not align annotated genes with reference genes. Default is: %(default)s')
     optional_group_alignment.add_argument('--refs_order', '-refs_ord',
+                                metavar='ORDER',
                                 type=str,
                                 nargs='+',
                                 default=[],
                                 dest='refs_order',
                                 help='Order(s) to use for reference genes. Can be specified multiple times. Default is: %(default)s')
     optional_group_alignment.add_argument('--custom_refs_folder', '-custom_refs',
+                                metavar='DIR',
                                 type=str,
                                 default=None,
                                 dest='custom_refs_folder',
@@ -69,15 +71,15 @@ def annotate_and_check_parser(subparsers):
     intergenic_group = parser_annotate_and_check.add_argument_group('Intergenic region analysis')
     
     intergenic_group.add_argument('--min_intergenic_length', '-min_ig_len',
+                                 metavar='INTEGER',
                                  type=int,
                                  default=0,
-                                 metavar='INTEGER',
                                  help='Minimum length of intergenic region to analyze. Default is: %(default)s')
     
     intergenic_group.add_argument('--blast_evalue', '-evalue',
+                                 metavar='FLOAT',
                                  type=float,
                                  default=1e-10,
-                                 metavar='FLOAT',
                                  help='BLAST E-value threshold for intergenic region analysis. Default is: %(default)s')
     
     intergenic_group.add_argument('--skip_intergenic_analysis', '-skip_ig',
@@ -91,9 +93,9 @@ def annotate_and_check_parser(subparsers):
                                  help='Write intergenic regions to FASTA files for debugging. Default is: %(default)s')
     
     intergenic_group.add_argument('--max_blast_hits', '-max_hits',
+                                 metavar='INTEGER',
                                  type=int,
                                  default=1,
-                                 metavar='INTEGER',
                                  help='Maximum number of BLAST hits to retain per intergenic region. Default is: %(default)s')
 
     ####################################################################################################################
@@ -103,14 +105,14 @@ def annotate_and_check_parser(subparsers):
     optional_group_general.add_argument('--output_directory', '-out_dir',
                                 type=str,
                                 default='output_directory',
-                                metavar='output_directory',
+                                metavar='DIR',
                                 help='Output directory for the subcommand. Default is: %(default)s')
-    optional_group_general.add_argument('--pool',
+    optional_group_general.add_argument('--pool', '-p',
                                  type=int,
                                  default=1,
                                  metavar='INTEGER',
                                  help='The number of CPUs to use for the subcommand. Default is: %(default)s')
-    optional_group_general.add_argument('--threads',
+    optional_group_general.add_argument('--threads', '-t',
                                  type=int,
                                  default=1,
                                  metavar='INTEGER',
@@ -118,18 +120,18 @@ def annotate_and_check_parser(subparsers):
     optional_group_general.add_argument('--chloe_project_dir', '-chloe_proj',
                                  type=str,
                                  default=None,
-                                 metavar='PATH',
+                                 metavar='DIR',
                                  help='Path to the chloe project directory to use as --project for Julia. Must be provided together with --chloe_script.')
     optional_group_general.add_argument('--chloe_script', '-chloe_jl',
                                  type=str,
                                  default=None,
                                  metavar='PATH',
                                  help='Path to the chloe.jl script. Must be provided together with --chloe_project_dir.')
-    optional_group_general.add_argument('--linearize_gene', '-linearize_gene',
+    optional_group_general.add_argument('--linearise_gene', '-linearise_gene',
                                  type=str,
                                  default='psbA',
                                  metavar='GENE_NAME',
-                                 help='Gene to use for genome linearization. Default is: %(default)s')
+                                 help='Gene to use for genome linearisation. Default is: %(default)s')
     optional_group_general.add_argument('--run_profiler',
                               action='store_true',
                               dest='run_profiler',

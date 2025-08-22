@@ -17,7 +17,7 @@ PAV is designed to process plastid genome assemblies, perform automated annotati
 ## Features
 
 - **Automated Annotation**: Uses Chloë for plastid genome annotation
-- **Genome Linearisation**: Automatically linearises genomes upstream of a specified gene (defaults to `psbA`)
+- **Genome Linearisation**: Automatically linearises genomes upstream of a specified gene (defaults to `psbA`) unless genome is specified as `linear`
 - **Reference-Based Validation**: Compares annotations against reference genomes from multiple sources (order-specific, default, or custom)
 - **Quality Assessment**: Validates gene lengths, identifies internal stop codons, and checks for canonical start and stop codons
 - **Alignment Generation**: Creates nucleotide alignments with reference sequences for CDS, rRNA, and tRNA genes
@@ -35,6 +35,7 @@ PAV is designed to process plastid genome assemblies, perform automated annotati
 - [MAFFT](https://mafft.cbrc.jp/alignment/software/source.html) (for alignments)
 - [TrimAl](https://vicfero.github.io/trimal/index.html) (for backtranslation)
 - [BLAST+](https://www.ncbi.nlm.nih.gov/books/NBK569861/) (for querying intergenic regions)
+- [Julia](https://julialang.org/downloads/) (for running Chloë)
 
 ### Setup
 
@@ -84,23 +85,23 @@ pav annotate_and_check \
 ```
 usage: pav annotate_and_check [-h] [--min_length_percentage FLOAT]
                               [--max_length_percentage FLOAT] [--no_alignment]
-                              [--refs_order REFS_ORDER [REFS_ORDER ...]]
-                              [--custom_refs_folder CUSTOM_REFS_FOLDER]
+                              [--refs_order ORDER [ORDER ...]]
+                              [--custom_refs_folder DIR]
                               [--min_intergenic_length INTEGER]
                               [--blast_evalue FLOAT]
                               [--skip_intergenic_analysis]
                               [--debug_intergenic] [--max_blast_hits INTEGER]
-                              [--output_directory output_directory]
-                              [--pool INTEGER] [--threads INTEGER]
-                              [--chloe_project_dir PATH] [--chloe_script PATH]
-                              [--linearize_gene GENE_NAME] [--run_profiler]
+                              [--output_directory DIR] [--pool INTEGER]
+                              [--threads INTEGER] [--chloe_project_dir DIR]
+                              [--chloe_script PATH]
+                              [--linearise_gene GENE_NAME] [--run_profiler]
                               DIR TSV
 
 options:
   -h, --help            show this help message and exit
 
 Required input:
-  DIR                   Directory containing plastid DNA FASTA files (supports both single and multi-sequence files).
+  DIR                   Directory containing plastid DNA FASTA files.
   TSV                   TSV file containing sample metadata for EMBL
                         conversion. Required file should contain columns:
                         fasta_filename, project_id, locus_tag, genus_species,
@@ -121,10 +122,10 @@ Alignment with reference genes:
   --no_alignment, -no_align
                         Do not align annotated genes with reference genes.
                         Default is: False
-  --refs_order REFS_ORDER [REFS_ORDER ...], -refs_ord REFS_ORDER [REFS_ORDER ...]
+  --refs_order ORDER [ORDER ...], -refs_ord ORDER [ORDER ...]
                         Order(s) to use for reference genes. Can be specified
                         multiple times. Default is: []
-  --custom_refs_folder CUSTOM_REFS_FOLDER, -custom_refs CUSTOM_REFS_FOLDER
+  --custom_refs_folder DIR, -custom_refs DIR
                         Custom folder containing reference GenBank files. Can
                         be used in addition to --refs_order or default
                         references.
@@ -146,22 +147,24 @@ Intergenic region analysis:
                         region. Default is: 1
 
 General pipeline options:
-  --output_directory output_directory, -out_dir output_directory
+  --output_directory DIR, -out_dir DIR
                         Output directory for the subcommand. Default is:
                         output_directory
-  --pool INTEGER        The number of CPUs to use for the subcommand. Default
+  --pool INTEGER, -p INTEGER
+                        The number of CPUs to use for the subcommand. Default
                         is: 1
-  --threads INTEGER     The number of threads to use for the subcommand.
+  --threads INTEGER, -t INTEGER
+                        The number of threads to use for the subcommand.
                         Default is: 1
-  --chloe_project_dir PATH, -chloe_proj PATH
+  --chloe_project_dir DIR, -chloe_proj DIR
                         Path to the chloe project directory to use as
                         --project for Julia. Must be provided together with
                         --chloe_script.
   --chloe_script PATH, -chloe_jl PATH
                         Path to the chloe.jl script. Must be provided together
                         with --chloe_project_dir.
-  --linearize_gene GENE_NAME, -linearize_gene GENE_NAME
-                        Gene to use for genome linearization. Default is: psbA
+  --linearise_gene GENE_NAME, -linearise_gene GENE_NAME
+                        Gene to use for genome linearisation. Default is: psbA
   --run_profiler        If supplied, run the subcommand using cProfile. Saves
                         a *.csv file of results. Default is: False
 ```
@@ -262,7 +265,7 @@ output_dir/
 │   │       ├── <sample>_<gene>_rRNA_alignment.fasta     # Per-sample rRNA alignment
 │   │       └── <sample>_<gene>_tRNA_alignment.fasta     # Per-sample tRNA alignment
 │   └── 02_per_gene_alignments/
-│       ├── <gene>_all_samples_alignment.fasta           # All samples combined (nucleotide)
+│       └── <gene>_all_samples_alignment.fasta           # All samples combined (nucleotide)
 ├── 04_intergenic_analysis/
     ├── <sample_name>_intergenic_blast_results.tsv       # Per-sample BLAST results
     └── combined_intergenic_blast_results.tsv            # Combined BLAST results
