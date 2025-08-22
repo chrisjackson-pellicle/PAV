@@ -14,9 +14,8 @@ import re
 import threading
 from multiprocessing import Manager
 import time
-import traceback
 
-# log_listener = None
+
 
 class LogManager:
     """Global log manager that handles automatic cleanup."""
@@ -40,7 +39,7 @@ class LogManager:
             self.log_listener.stop()
             self.log_listener.join()
     
-    def handle_error(self, error, operation_name, id=None):
+    def handle_error(self, error, tb, operation_name, id=None):
         """Handle errors with automatic cleanup."""
         if self.logger:
             if id:
@@ -54,12 +53,12 @@ class LogManager:
                 self.logger.error(f'{"":15} STDOUT: {error.stdout}')
                 self.logger.error(f'{"":15} STDERR: {error.stderr}')
                 self.logger.error(f'{"":15} Full traceback:')
-                self.logger.error(traceback.format_exc())
+                self.logger.error(tb)
             
             elif isinstance(error, Exception):
                 self.logger.error(f'{"":15} Exception: {error}')
                 self.logger.error(f'{"":15} Full traceback:')
-                self.logger.error(traceback.format_exc())
+                self.logger.error(tb)
 
         self.cleanup()
         sys.exit(1)

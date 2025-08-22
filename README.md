@@ -12,7 +12,7 @@ A tool for annotating and validating angiosperm plastid genome annotations, with
 
 ## Overview
 
-PAV is designed to process plastid genome assemblies, perform automated annotation using [Chloë](https://github.com/ian-small/Chloe.jl), validate gene annotations against reference sequences, and generate comprehensive reports. The tool includes features for genome linearization, reference-based alignment, detailed quality assessment, and EMBL/ENA template generation.
+PAV is designed to process plastid genome assemblies, perform automated annotation using [Chloë](https://github.com/ian-small/Chloe.jl), validate gene annotations against reference sequences, and generate comprehensive reports. The tool includes features for genome linearization, reference-based alignment, detailed quality assessment, and EMBL/ENA template generation. PAV supports both single and multi-sequence FASTA files, automatically detecting and processing each sequence individually.
 
 ## Features
 
@@ -24,6 +24,7 @@ PAV is designed to process plastid genome assemblies, perform automated annotati
 - **Comprehensive Reporting**: Generates detailed reports and statistics
 - **EMBL and ENA Template Conversion**: Converts annotated GenBank records to EMBL and produces ENA submission-ready templates
 - **Intergenic Region Analysis**: BLAST analysis of intergenic regions for functional characterization
+- **Multi-Sequence Support**: Automatic detection and processing of multi-sequence FASTA files
 
 ## Installation
 
@@ -99,7 +100,7 @@ options:
   -h, --help            show this help message and exit
 
 Required input:
-  DIR                   Directory containing plastid DNA FASTA files.
+  DIR                   Directory containing plastid DNA FASTA files (supports both single and multi-sequence files).
   TSV                   TSV file containing sample metadata for EMBL
                         conversion. Required file should contain columns:
                         fasta_filename, project_id, locus_tag, genus_species,
@@ -215,7 +216,7 @@ pav annotate_and_check \
   --linearize_gene rbcL
 ```
 
-#### Custom parameters:
+#### High-performance processing:
 ```bash
 pav annotate_and_check \
   genomes/ \
@@ -224,8 +225,8 @@ pav annotate_and_check \
   --refs_order Alismatales \
   --min_length_percentage 0.9 \
   --max_length_percentage 1.1 \
-  --pool 4 \
-  --threads 2
+  --pool 8 \
+  --threads 4
 ```
 
 ## Output Structure
@@ -248,6 +249,9 @@ output_dir/
 │       ├── <prefix>_linearized.chloe.gff        # Re-annotated after linearization
 │       └── <prefix>_linearized.fasta            # Linearized sequence
 │       └── <prefix>_linearized.chloe_intergenic_debug.fasta   # Optional (when --debug_intergenic)
+│       └── <prefix>_seq001_<seqname>.fasta      # Individual sequences (multi-sequence files only)
+│       └── <prefix>_seq001_<seqname>.chloe.gbk  # Individual sequence annotations
+│       └── <prefix>_seq001_<seqname>.chloe.gff  # Individual sequence GFF files
 ├── 02_embl_files/
 │   ├── <sample_name>.embl                        # EMBL format
 │   └── <sample_name>.ena.embl                    # ENA template (derived from EMBL)
@@ -269,6 +273,8 @@ output_dir/
 
 ### 1. Genome Annotation
 - Processes input FASTA files using Chloë
+- **Supports both single and multi-sequence FASTA files**
+- For multi-sequence FASTA files, each sequence is processed separately with Chloë
 - Performs initial annotation on original sequences
 - Linearizes genomes upstream of a specified gene (default: psbA), unless sample is recorded as `linear` in metadata
 - Re-annotates linearized sequences
@@ -287,7 +293,7 @@ output_dir/
 - Adds locus tags and standardizes features for EMBL
 - Builds EMBL templates using metadata TSV (see below), ready for submission to ENA
 
-### 6. Intergenic Region Analysis
+### 5. Intergenic Region Analysis
 - Extracts intergenic regions from annotated genomes
 - Performs BLAST analysis against reference databases
 - Generates comprehensive reports of intergenic region characteristics

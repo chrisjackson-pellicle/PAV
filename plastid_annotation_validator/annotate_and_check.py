@@ -44,24 +44,17 @@ import gzip
 from collections import defaultdict
 from Bio import SeqIO
 from Bio.SeqRecord import SeqRecord
-from Bio.Seq import Seq
-from Bio.SeqFeature import FeatureLocation, SeqFeature, CompoundLocation
+from Bio.SeqFeature import FeatureLocation, SeqFeature
 import traceback
-from copy import deepcopy
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from tqdm import tqdm
 import subprocess
 import tempfile
 import glob
-import re
-import shutil
-import uuid
-from Bio import AlignIO
-import io
 import pandas as pd
 import importlib.resources
 import time
-from pathlib import Path
+import re
 
 # Import NewTargets modules:
 from plastid_annotation_validator.version import __version__
@@ -135,7 +128,7 @@ def parse_gbk_genes(gbk_file_path, fasta_file_path, logger, gene_synonyms=None):
     This function processes a GenBank file to extract comprehensive gene annotation information:
     1. Parses CDS, rRNA, and tRNA features from the GenBank file
     2. Extracts gene names and applies synonym mapping for standardization
-    3. Calculates gene lengths and handles multiple gene copies
+    3. Creates individual entries for each gene copy with appropriate suffixes
     4. Extracts sequence information for translation validation
     5. Organizes information into structured dictionaries for downstream analysis
     
@@ -149,21 +142,25 @@ def parse_gbk_genes(gbk_file_path, fasta_file_path, logger, gene_synonyms=None):
     Returns:
         tuple: (gene_lengths, gene_cds_info, gene_rRNA_info, gene_tRNA_info) where:
             - gene_lengths (dict): Dictionary mapping gene names to length information containing:
-                - 'length': Representative gene length (mean if multiple copies)
-                - 'copies': Number of copies of this gene in the genome
-                - 'mean_length': Mean length across all copies
-                - 'copy_lengths': List of individual copy lengths
+                - 'annotated_gene_length': Individual gene length for this copy
+                - 'copies': Always 1 (each copy is stored separately)
+                - 'copy_lengths': List containing single length for this copy
             - gene_cds_info (dict): Dictionary mapping gene names to CDS information for translation checking
             - gene_rRNA_info (dict): Dictionary mapping gene names to rRNA information
             - gene_tRNA_info (dict): Dictionary mapping gene names to tRNA information
+            
+    Note:
+        Multiple copies of the same gene are stored as separate entries with suffixes:
+        - First copy: original gene name (e.g., 'rps12')
+        - Subsequent copies: gene name with '_copy_N' suffix (e.g., 'rps12_copy_2', 'rps12_copy_3')
     
     Raises:
         ValueError: If no records are found in the GenBank file or if a feature lacks a gene name
         Exception: Various exceptions that may occur during file parsing or sequence extraction
         
     Note:
-        The function handles multiple copies of the same gene by calculating mean lengths
-        and storing individual copy information. Gene names are standardized using the
+        The function handles multiple copies of the same gene by creating separate entries
+        for each copy with appropriate suffixes. Gene names are standardized using the
         provided synonym mapping if available.
     """
     gene_lengths = {}
@@ -184,10 +181,11 @@ def parse_gbk_genes(gbk_file_path, fasta_file_path, logger, gene_synonyms=None):
         if not records:
             raise ValueError(f"No records found in GenBank file: {gbk_file_path}")
         
-        # Process each record (usually only one for plastid genomes)
+        # Process each record (should be only one as I've split multi-fasta in to individual files)
         for record in records:
             # Initialize data structures for this record
-            gene_features = defaultdict(list)
+            gene_lengths = defaultdict(list)
+            gene_data = dict()
             gene_cds_locations = defaultdict(list)
             gene_rRNA_locations = defaultdict(list)
             gene_tRNA_locations = defaultdict(list)
@@ -219,7 +217,7 @@ def parse_gbk_genes(gbk_file_path, fasta_file_path, logger, gene_synonyms=None):
                     length_mismatch_msg = f"Gene {mapped_gene_name} length mismatch: Expected {gene_length} != Extracted {len(extracted_seq)}"
                 
                 # Store gene length information
-                gene_features[mapped_gene_name].append(gene_length)
+                gene_lengths[mapped_gene_name].append(gene_length)
                 
                 # Store feature-specific information
                 feature_info = {
@@ -239,37 +237,62 @@ def parse_gbk_genes(gbk_file_path, fasta_file_path, logger, gene_synonyms=None):
                     feature_info['tRNA_seq'] = extracted_seq
                     gene_tRNA_locations[mapped_gene_name].append(feature_info)
             
-            # Calculate final gene lengths and organize information
-            for gene_name, lengths in gene_features.items():
-                # Calculate representative length (mean if multiple copies)
-                if len(lengths) == 1:
-                    representative_length = lengths[0]
+            # Process each gene and create individual entries for each copy
+            for gene_name, lengths in gene_lengths.items():
+                # Get the feature lists for this gene
+                cds_features = gene_cds_locations.get(gene_name, [])
+                rrna_features = gene_rRNA_locations.get(gene_name, [])
+                trna_features = gene_tRNA_locations.get(gene_name, [])
+                
+                # Determine how many copies we have (use the maximum from any feature type)
+                total_copies = max(len(lengths), len(cds_features), len(rrna_features), len(trna_features))
+                
+                if total_copies == 1:
+                    # Single copy - use original gene name
+                    copy_name = gene_name
+                    
+                    # Store gene length information
+                    gene_data[copy_name] = {
+                        'annotated_gene_length': lengths[0],
+                        'copies': 1,
+                        'copy_lengths': lengths
+                    }
+                    
+                    # Store feature information
+                    if cds_features:
+                        gene_cds_info[copy_name] = cds_features
+                    if rrna_features:
+                        gene_rRNA_info[copy_name] = rrna_features
+                    if trna_features:
+                        gene_tRNA_info[copy_name] = trna_features
+                        
                 else:
-                    representative_length = round(sum(lengths) / len(lengths))
-                    logger.debug(f"{"[DEBUG]:":10} Gene {gene_name} has {len(lengths)} copies with lengths: {lengths}, using mean: {representative_length:.1f}")
-                
-                # Store gene length information
-                gene_lengths[gene_name] = {
-                    'length': representative_length,
-                    'copies': len(lengths),
-                    'mean_length': representative_length,
-                    'copy_lengths': lengths
-                }
-                
-                # Store CDS information if available
-                if gene_name in gene_cds_locations:
-                    gene_cds_info[gene_name] = gene_cds_locations[gene_name]
-                
-                # Store rRNA information if available
-                if gene_name in gene_rRNA_locations:
-                    gene_rRNA_info[gene_name] = gene_rRNA_locations[gene_name]
-                
-                # Store tRNA information if available
-                if gene_name in gene_tRNA_locations:
-                    gene_tRNA_info[gene_name] = gene_tRNA_locations[gene_name]
+                    # Multiple copies - create individual entries with suffixes
+                    logger.debug(f"{"[DEBUG]:":10} Gene {gene_name} has {total_copies} copies, creating individual entries")
+                    
+                    for copy_num in range(1, total_copies + 1):
+                        copy_name = f"{gene_name}_copy_{copy_num}"
+                        
+                        # Get the length for this copy 
+                        copy_length = lengths[copy_num - 1]
+                        
+                        # Store gene length information
+                        gene_data[copy_name] = {
+                            'annotated_gene_length': copy_length,
+                            'copies': len(lengths),
+                            'copy_lengths': lengths
+                        }
+                        
+                        # Store feature information for this copy
+                        if copy_num <= len(cds_features):
+                            gene_cds_info[copy_name] = [cds_features[copy_num - 1]]
+                        if copy_num <= len(rrna_features):
+                            gene_rRNA_info[copy_name] = [rrna_features[copy_num - 1]]
+                        if copy_num <= len(trna_features):
+                            gene_tRNA_info[copy_name] = [trna_features[copy_num - 1]]
         
         logger.debug(f"{"[DEBUG]:":10} Parsed {len(gene_lengths)} genes (CDS, rRNA, and tRNA) from GenBank file")
-        return gene_lengths, gene_cds_info, gene_rRNA_info, gene_tRNA_info
+        return gene_data, gene_cds_info, gene_rRNA_info, gene_tRNA_info
         
     except Exception as e:
         logger.error(f"{"[ERROR]:":10} Error parsing GenBank file: {e}")
@@ -289,9 +312,6 @@ def _extract_gene_name(feature):
     """
     if 'gene' in feature.qualifiers:
         return feature.qualifiers['gene'][0]
-    elif 'product' in feature.qualifiers:
-        # Use first word of product name as fallback
-        return feature.qualifiers['product'][0].split()[0]
     return None
 
 
@@ -364,7 +384,7 @@ def check_single_sample_genes(sample_data, gene_median_lengths, min_threshold, m
     Validate gene annotations for a single plastid genome sample by checking gene lengths and translation quality.
     
     This function performs comprehensive validation of gene annotations for one sample by:
-    1. Parsing the GenBank file to extract gene annotations and sequences
+    1. Parsing the GenBank files to extract gene annotations and sequences (supports multiple files per sample)
     2. Comparing gene lengths against reference median lengths from a curated database
     3. Checking translation quality for CDS genes to identify potential annotation issues
     4. Applying gene synonym mapping for standardized gene naming
@@ -373,8 +393,8 @@ def check_single_sample_genes(sample_data, gene_median_lengths, min_threshold, m
     Args:
         sample_data (dict): Dictionary containing sample information with keys:
             - 'sample_name': Name of the sample being processed
-            - 'gbk_file': Path to the annotated GenBank file
-            - 'fasta_file': Path to the corresponding FASTA file
+            - 'gbk_files': List of paths to annotated GenBank files
+            - 'fasta_files': List of paths to corresponding FASTA files
         gene_median_lengths (dict): Dictionary mapping gene names to their reference median lengths
         min_threshold (float): Minimum acceptable length as percentage of median (e.g., 0.8 for 80%)
         max_threshold (float): Maximum acceptable length as percentage of median (e.g., 1.2 for 120%)
@@ -388,23 +408,29 @@ def check_single_sample_genes(sample_data, gene_median_lengths, min_threshold, m
             - success (bool): True if processing completed successfully, False if an error occurred
             - result: If success=True, a dictionary containing:
                 - 'sample_name': Name of the processed sample
-                - 'gene_results': Dictionary mapping gene names to validation results containing:
-                    - 'gene_name': Gene identifier
-                    - 'actual_length': Observed gene length in base pairs
-                    - 'copies': Number of copies of this gene in the genome
-                    - 'copy_lengths': List of lengths for each copy
-                    - 'threshold_min': Minimum threshold used for validation
-                    - 'threshold_max': Maximum threshold used for validation
-                    - 'median_length': Reference median length (if available)
-                    - 'issue': Validation status ('OK', 'too_short', 'too_long', 'not_in_median_lengths')
-                    - 'details': Detailed description of any issues found
-                    - 'translation_status': Translation validation status ('OK' or 'FAIL')
-                    - 'translation_details': Details about translation issues (if any)
+                - 'sequence_gene_data': Dictionary mapping sequence names to gene data containing:
+                    - 'gbk_file': Path to GenBank file for this sequence
+                    - 'fasta_file': Path to FASTA file for this sequence
+                    - 'gene_cds_info': CDS information for this sequence
+                    - 'gene_rRNA_info': rRNA information for this sequence
+                    - 'gene_tRNA_info': tRNA information for this sequence
+                    - 'sequence_gene_data': Dictionary mapping gene names to validation results containing:
+                        - 'gene_name': Gene identifier
+                        - 'annotated_gene_length': Observed gene length in base pairs
+                        - 'copies': Number of copies of this gene in the genome
+                        - 'copy_lengths': List of lengths for each copy
+                        - 'threshold_min': Minimum threshold used for validation
+                        - 'threshold_max': Maximum threshold used for validation
+                        - 'median_length': Reference median length (if available)
+                        - 'issue': Validation status ('OK', 'too_short', 'too_long', 'not_in_median_lengths')
+                        - 'details': Detailed description of any issues found
+                        - 'translation_status': Translation validation status ('OK' or 'FAIL')
+                        - 'translation_details': Details about translation issues (if any)
                 - 'total_genes': Total number of genes processed
                 - 'genes_with_warnings': Count of genes that failed validation
-                - 'gene_cds_info': CDS location information for translation checking
-                - 'gene_rRNA_info': rRNA location information
-                - 'gene_tRNA_info': tRNA location information
+                - 'gene_cds_info': Combined CDS location information for translation checking
+                - 'gene_rRNA_info': Combined rRNA location information
+                - 'gene_tRNA_info': Combined tRNA location information
             If success=False, result is a tuple (exception, traceback) for error handling
     
     Raises:
@@ -421,109 +447,164 @@ def check_single_sample_genes(sample_data, gene_median_lengths, min_threshold, m
         worker_logger = utils.setup_worker_logger(__name__, log_queue)
 
         sample_name = sample_data.get('sample_name', 'unknown')
-        gbk_file = sample_data['gbk_file']
-        fasta_file = sample_data['fasta_file']
+        gbk_files = sample_data['gbk_files']
+        fasta_files = sample_data['fasta_files']
 
         length_warnings = set()
-        sample_dict = {}
-    
-        # Parse gene lengths and CDS information from GenBank file (adjusted in-memory)
-        gene_lengths, gene_cds_info, gene_rRNA_info, gene_tRNA_info = parse_gbk_genes(gbk_file, fasta_file, worker_logger, gene_synonyms)
+        
+        # Process each file for a sample and combine the results
+        sequence_gene_data = {}
+        combined_gene_cds_info = {}
+        combined_gene_rRNA_info = {}
+        combined_gene_tRNA_info = {}
+        
+        # Process each file for a sample and combine the results
+        for gbk_file, fasta_file in zip(gbk_files, fasta_files):
+            # Parse gene lengths and CDS information from GenBank file (adjusted in-memory)
+            gene_data, gene_cds_info, gene_rRNA_info, gene_tRNA_info = parse_gbk_genes(gbk_file, fasta_file, worker_logger, gene_synonyms)
 
+            # Store individual sequence data for reporting
+            seq_filename = os.path.basename(gbk_file)
+            # Extract sequence name by removing file extensions
+            seq_name = seq_filename
+            for ext in ['.chloe.gbk', '.round1.chloe.gbk', 'round2.chloe.gbk']:
+                if seq_name.endswith(ext):
+                    seq_name = seq_name[:-len(ext)]
+                    break
+
+            # Store individual sequence data with validation fields initialized
+            sequence_gene_data[seq_name] = {
+                'gbk_file': gbk_file,
+                'fasta_file': fasta_file,
+                'gene_cds_info': gene_cds_info,
+                'gene_rRNA_info': gene_rRNA_info,
+                'gene_tRNA_info': gene_tRNA_info,
+                'sequence_gene_data': {}
+            }
+            
+            # Process genes for this sequence and add validation fields
+            for gene_name, gene_info in gene_data.items():
+                
+                # Add validation fields to gene info
+                gene_info_with_validation = {
+                    'threshold_min': min_threshold,
+                    'threshold_max': max_threshold,
+                    'ref_median_length': None,
+                    'issue': None,
+                    'details': None,
+                    'translation_status': None,
+                    'translation_details': None,
+                }
+                gene_info_with_validation.update(gene_info)
+
+                sequence_gene_data[seq_name]['sequence_gene_data'][gene_name] = gene_info_with_validation
+
+            # Combine CDS, rRNA, and tRNA info from each sequence into a single dict
+            for gene_name, info in gene_cds_info.items():
+                if gene_name in combined_gene_cds_info:
+                    combined_gene_cds_info[gene_name].extend(info)
+                else:
+                    combined_gene_cds_info[gene_name] = info.copy()
+            
+            for gene_name, info in gene_rRNA_info.items():
+                if gene_name in combined_gene_rRNA_info:
+                    combined_gene_rRNA_info[gene_name].extend(info)
+                else:
+                    combined_gene_rRNA_info[gene_name] = info.copy()
+            
+            for gene_name, info in gene_tRNA_info.items():
+                if gene_name in combined_gene_tRNA_info:
+                    combined_gene_tRNA_info[gene_name].extend(info)
+                else:
+                    combined_gene_tRNA_info[gene_name] = info.copy()
+        
+        # Get all unique gene names from all sequences
+        all_gene_names = set()
+        for seq_data in sequence_gene_data.values():
+            all_gene_names.update(seq_data['sequence_gene_data'].keys())
+
+        all_gene_names_no_copy_suffix = set([gene_name.split('_copy_')[0] for gene_name in all_gene_names])
+
+        # print(f'all_gene_names: {all_gene_names}')
+        
         # Check for genes in CDS info that are not in gene lengths
-        cds_only_genes = set(gene_cds_info.keys()) - set(gene_lengths.keys())
+        cds_only_genes = set(combined_gene_cds_info.keys()) - all_gene_names
         if cds_only_genes:
             return False, (ValueError(f"Genes in CDS info but not in gene lengths: {list(cds_only_genes)[:10]}"), traceback.format_exc())
         
         # Check for genes present in gene_lengths but not in gene_median_lengths, and vice versa
-        genes_in_lengths_not_in_median = list(set(gene_lengths.keys()) - set(gene_median_lengths.keys()))
-        genes_in_median_not_in_lengths = list(set(gene_median_lengths.keys()) - set(gene_lengths.keys()))
+        genes_in_lengths_not_in_median = list(all_gene_names_no_copy_suffix - set(gene_median_lengths.keys()))
+        genes_in_median_not_in_lengths = list(set(gene_median_lengths.keys()) - all_gene_names_no_copy_suffix)
         
         if genes_in_lengths_not_in_median:
             worker_logger.debug(f"{"[DEBUG]:":10} Genes in sample {sample_name} but not in median lengths: {genes_in_lengths_not_in_median}...")
-            # tqdm.write(f"{"[INFO]:":10} Genes in sample {sample_name} but not in median lengths: {genes_in_lengths_not_in_median}...")
         if genes_in_median_not_in_lengths:
             worker_logger.debug(f"{"[DEBUG]:":10} Genes in median lengths but not in sample {sample_name}: {genes_in_median_not_in_lengths}...")
-            # tqdm.write(f"{"[INFO]:":10} Genes in median lengths but not in sample {sample_name}: {genes_in_median_not_in_lengths}...")
        
-        # Check each gene against median lengths and translation
-        for gene_name, gene_info in gene_lengths.items():
+        # Check each gene copy against median lengths and translation
+        for seq_name, seq_data in sequence_gene_data.items():
+            gene_info_dict = seq_data['sequence_gene_data']
 
-            actual_length = gene_info['length']
-            copies = gene_info['copies']
-            copy_lengths = gene_info['copy_lengths']
+            for gene_name, gene_info in gene_info_dict.items():
+                annotated_gene_length = gene_info['annotated_gene_length']
+                gene_name_no_copy_suffix = gene_name.split('_copy_')[0]
+                
+                # Check length against median
+                if gene_name_no_copy_suffix in gene_median_lengths:
+                    median_length = gene_median_lengths[gene_name_no_copy_suffix]
+                    min_expected = median_length * min_threshold
+                    max_expected = median_length * max_threshold
 
-            # Add gene to sample_dict with basic info and placeholders
-            sample_dict[gene_name] = {
-                'gene_name': gene_name,
-                'actual_length': actual_length,
-                'copies': copies,
-                'copy_lengths': copy_lengths,
-                'threshold_min': min_threshold,
-                'threshold_max': max_threshold,
-                'median_length': None,
-                'issue': None,
-                'details': None,
-                'translation_status': 'N/A',
-                'translation_details': 'N/A',
-            }
-            
-            # Check length against median
-            if gene_name in gene_median_lengths:
-                median_length = gene_median_lengths[gene_name]
-                min_expected = median_length * min_threshold
-                max_expected = median_length * max_threshold
+                    # Add median length info to gene_info
+                    gene_info['ref_median_length'] = median_length
+       
+                    # Check if gene is too short
+                    if annotated_gene_length < min_expected:
+                        warning_msg = f"Too short: {annotated_gene_length} bp < {min_expected:.0f} bp ({min_threshold*100}% of ref median)"
+                        gene_info['issue'] = 'too_short'
+                        gene_info['details'] = warning_msg
+                        length_warnings.add(gene_name)
 
-                # Add median length info to sample_dict
-                sample_dict[gene_name]['median_length'] = median_length
-   
-                # Check if gene is too short
-                if actual_length < min_expected:
-                    warning_msg = f"Too short: {actual_length} bp < {min_expected:.0f} bp ({min_threshold*100}% of ref median)"
-                    sample_dict[gene_name]['issue'] = 'too_short'
-                    sample_dict[gene_name]['details'] = warning_msg
-                    length_warnings.add(gene_name)
+                    # Check if gene is too long
+                    elif annotated_gene_length > max_expected:
+                        warning_msg = f"Too long: {annotated_gene_length} bp > {max_expected:.0f} bp ({max_threshold*100}% of median)"
+                        gene_info['issue'] = 'too_long'
+                        gene_info['details'] = warning_msg
+                        length_warnings.add(gene_name)
 
-                # Check if gene is too long
-                elif actual_length > max_expected:
-                    warning_msg = f"Too long: {actual_length} bp > {max_expected:.0f} bp ({max_threshold*100}% of median)"
-                    sample_dict[gene_name]['issue'] = 'too_long'
-                    sample_dict[gene_name]['details'] = warning_msg
-                    length_warnings.add(gene_name)
+                    else:
+                        gene_info['issue'] = 'OK'
+                        gene_info['details'] = 'OK'
 
                 else:
-                    sample_dict[gene_name]['issue'] = 'OK'
-                    sample_dict[gene_name]['details'] = 'OK'
-
-            else:
-                worker_logger.warning(f"{"[WARNING]:":10} Gene {gene_name} not in gene_median_lengths")
-                # tqdm.write(f"{"[WARNING]:":10} Gene {gene_name} not in gene_median_lengths")
-                sample_dict[gene_name]['issue'] = 'not_in_median_lengths'
-                sample_dict[gene_name]['details'] = 'Not in median lengths'
-                length_warnings.add(gene_name)
-            
-            # Check translation for CDS genes and create alignments with reference CDSs (optional)
-            if gene_name in gene_cds_info:
-                translation_issues = check_gene_translation(gene_name, gene_cds_info[gene_name], logger)
-
-                if translation_issues:
-                    sample_dict[gene_name]['translation_status'] = 'FAIL'
-                    sample_dict[gene_name]['translation_details'] = translation_issues
+                    worker_logger.warning(f"{"[WARNING]:":10} Gene {gene_name_no_copy_suffix} not in gene_median_lengths")
+                    gene_info['issue'] = 'not_in_median_lengths'
+                    gene_info['details'] = 'Not in reference median lengths'
                     length_warnings.add(gene_name)
-                else:
-                    sample_dict[gene_name]['translation_status'] = 'OK'
-                    sample_dict[gene_name]['translation_details'] = 'OK'
+                
+                # Check translation for CDS genes
+                if gene_name in combined_gene_cds_info:
+                    translation_issues = check_gene_translation(gene_name, combined_gene_cds_info[gene_name], logger)
+
+                    if translation_issues:
+                        gene_info['translation_status'] = 'FAIL'
+                        gene_info['translation_details'] = translation_issues
+                        length_warnings.add(gene_name)
+                    else:
+                        gene_info['translation_status'] = 'OK'
+                        gene_info['translation_details'] = 'OK'
 
         # Collate results for return
         result_dict = {
             'sample_name': sample_name,
-            'gene_results': sample_dict,
-            'total_genes': len(gene_lengths),
+            'gene_results': {},  # No longer needed - data is in sequence_gene_data
+            'total_genes': len(all_gene_names),
             'genes_with_warnings': len(length_warnings),
-            'gene_cds_info': gene_cds_info,
-            'gene_rRNA_info': gene_rRNA_info,
-            'gene_tRNA_info': gene_tRNA_info,
-            'missing_genes': genes_in_median_not_in_lengths
+            'gene_cds_info': combined_gene_cds_info,
+            'gene_rRNA_info': combined_gene_rRNA_info,
+            'gene_tRNA_info': combined_gene_tRNA_info,
+            'missing_genes': genes_in_median_not_in_lengths,
+            'sequence_gene_data': sequence_gene_data
         }
 
         return True, result_dict
@@ -538,7 +619,7 @@ def check_genes(gene_median_lengths, annotated_genomes_dict, min_threshold, max_
     Validate gene annotations across multiple plastid genomes by comparing gene lengths against reference median values.
     
     This function processes annotated plastid genomes and validates gene annotations by:
-    1. Parsing GenBank files to extract gene annotations and sequences
+    1. Parsing GenBank files to extract gene annotations and sequences (supports multiple files per sample)
     2. Comparing gene lengths against reference median lengths from a curated database
     3. Applying gene synonym mapping for standardized gene naming
     4. Generating comprehensive reports of validation results
@@ -547,8 +628,10 @@ def check_genes(gene_median_lengths, annotated_genomes_dict, min_threshold, max_
     Args:
         gene_median_lengths (dict): Dictionary mapping gene names to their reference median lengths
         annotated_genomes_dict (dict): Dictionary mapping sample names to dicts containing:
-            - 'gbk': Path to annotated GenBank file
-            - 'fasta': Path to corresponding FASTA file
+            - 'gbk': Path to annotated GenBank file (single) or list of paths (multi-sequence)
+            - 'fasta': Path to corresponding FASTA file (single) or list of paths (multi-sequence)
+            - 'is_multi_sequence': Boolean indicating if this is a multi-sequence sample
+            - 'sequence_count': Number of sequences in this sample
         min_threshold (float): Minimum acceptable length as percentage of median (e.g., 80.0 for 80%)
         max_threshold (float): Maximum acceptable length as percentage of median (e.g., 120.0 for 120%)
         report_directory (str): Directory path where validation reports will be written
@@ -559,7 +642,10 @@ def check_genes(gene_median_lengths, annotated_genomes_dict, min_threshold, max_
 
     Returns:
         dict: Dictionary mapping sample names to validation results containing:
-            - 'gene_results': Dictionary of gene validation results
+            - 'sequence_gene_data': Dictionary mapping sequence names to gene data
+            - 'gene_cds_info': Combined CDS information across all sequences
+            - 'gene_rRNA_info': Combined rRNA information across all sequences
+            - 'gene_tRNA_info': Combined tRNA information across all sequences
             - 'genes_with_warnings': Count of genes that failed validation
             - 'total_genes': Total number of genes processed
             - 'error': Error message if processing failed (optional)
@@ -569,8 +655,10 @@ def check_genes(gene_median_lengths, annotated_genomes_dict, min_threshold, max_
         
     Note:
         The function uses multiprocessing to process samples in parallel, with each sample
-        being validated independently. Results are collected and combined into comprehensive
-        reports including both individual sample reports and a combined summary.
+        being validated independently. For multi-sequence samples, all sequences are processed
+        together and gene data is collated across all sequences. Results are collected and 
+        combined into comprehensive reports including both individual sample reports and a 
+        combined summary.
     """
 
     all_sample_results = {}
@@ -579,13 +667,23 @@ def check_genes(gene_median_lengths, annotated_genomes_dict, min_threshold, max_
     # Prepare data for multiprocessing
     sample_data_list = []
     for sample_name, data in annotated_genomes_dict.items():
+        # Handle both single files and lists of files (for multi-sequence samples)
+        if isinstance(data['gbk'], list):
+            # Multi-sequence sample - collect all files
+            gbk_files = data['gbk']
+            fasta_files = data['fasta']
+        else:
+            # Single sequence sample - convert to lists for consistent processing
+            gbk_files = [data['gbk']]
+            fasta_files = [data['fasta']]
+        
         sample_data = {
-            'fasta_file': data['fasta'],
-            'gbk_file': data['gbk'],
+            'fasta_files': fasta_files,
+            'gbk_files': gbk_files,
             'sample_name': sample_name
         }
         sample_data_list.append(sample_data)
-    
+
     # Process samples with multiprocessing and progress bar
     with ProcessPoolExecutor(max_workers=pool_size) as executor:
         # Submit all tasks
@@ -613,7 +711,7 @@ def check_genes(gene_median_lengths, annotated_genomes_dict, min_threshold, max_
                 total_warnings += result['genes_with_warnings']
 
             else:
-                utils.log_manager.handle_error(result[0], "Gene length checking", sample_name)
+                utils.log_manager.handle_error(result[0], result[1], "check_genes()", sample_name)
 
     # Generate and write report
     write_gene_length_report(all_sample_results, logger, min_threshold, max_threshold, report_directory, gene_median_lengths)
@@ -633,140 +731,153 @@ def write_gene_length_report(all_results, logger, min_threshold, max_threshold, 
     3. Summary statistics for warnings and validation issues
     4. Detailed information about gene lengths, copies, and translation quality
     
-    The reports include information about:
-    - Gene length validation against reference median values
-    - Translation quality checks for CDS genes
-    - Multiple gene copy handling and analysis
-    - Warning categorization and detailed descriptions
-    
     Args:
-        all_results (dict): Dictionary mapping sample names to validation results containing:
-            - 'gene_results': Dictionary of gene validation results for each gene
-            - 'error': Error message if sample processing failed (optional)
+        all_results (dict): Dictionary mapping sample names to validation results
         logger: Logger instance for logging messages and progress updates
-        min_threshold (float): Minimum acceptable length as percentage of median used for validation
-        max_threshold (float): Maximum acceptable length as percentage of median used for validation
+        min_threshold (float): Minimum acceptable length as percentage of median
+        max_threshold (float): Maximum acceptable length as percentage of median
         report_directory (str): Directory path where all reports will be written
         gene_median_lengths (dict): Dictionary mapping gene names to their reference median lengths
     
     Returns:
         None: Reports are written directly to files in the specified directory
-        
-    Generated Files:
-        - Individual sample reports: "{sample_name}_gene_validation_report.tsv"
-        - Combined report: "all_samples_gene_validation_report.tsv"
-        
-    Report Format (TSV with headers):
-        - Sample: Sample identifier
-        - Gene_ID: Gene identifier
-        - Gene_Name: Gene name (same as Gene_ID)
-        - Actual_Length: Observed gene length in base pairs
-        - Median_Length_Refs: Reference median length (NA if not available)
-        - Min_Threshold: Minimum threshold percentage used
-        - Max_Threshold: Maximum threshold percentage used
-        - Copies: Number of copies of this gene in the genome
-        - Copy_Lengths: Comma-separated list of individual copy lengths
-        - Warning: Validation status and warning messages
-        - Translation_Details: Details about translation quality issues
-        
-    Warning Categories:
-        - 'too_short': Gene length below minimum threshold
-        - 'too_long': Gene length above maximum threshold
-        - 'not_in_median_lengths': Gene not found in reference database
-        - 'Translation issue': Problems with CDS translation
-        - 'OK': No validation issues found
-        
-    Note:
-        The function handles both successful samples and samples with processing errors.
-        Error samples are included in the combined report with appropriate error indicators.
-        All reports use tab-separated values (TSV) format for easy parsing and analysis.
     """
+    
+    def create_tsv_header():
+        """Create TSV header with sequence column."""
+        
+        return ["Sequence", "Gene_Name", "Annotation_Length", "Median_Length_Refs", 
+                "Min_Threshold", "Max_Threshold", "Copies", 
+                "Warning", "Translation_Details"]
+    
+    def format_tsv_row(sequence_name, gene_name, annotation_length, median_length, 
+                      min_threshold, max_threshold, copies, 
+                      warning_msg, translation_details):
+        """Format a single TSV row with sequence column."""
+
+        median_str = str(median_length) if median_length is not None else 'NA'
+        
+        return [str(sequence_name), str(gene_name), str(annotation_length), median_str, 
+                str(min_threshold), str(max_threshold), str(copies), 
+                str(warning_msg), str(translation_details)]
+    
+    def process_gene_data(gene_name, gene_info, sequence_name):
+        """Process gene data and return formatted row data."""
+        # Extract data from gene_info (handles both single and multi-sequence structures)
+        annotation_length = gene_info.get('annotated_gene_length', 'Unknown')
+        copies = gene_info['copies']
+        median_length = gene_info.get('ref_median_length')
+        translation_details = gene_info.get('translation_details', '')
+        
+        # Use existing warning data instead of recalculating
+        issue = gene_info.get('issue', 'unknown')
+        details = gene_info.get('details', '')
+        translation_status = gene_info.get('translation_status', 'OK')
+        
+        # Build warning message from existing data
+        warning_parts = []
+        if issue == 'too_short' or issue == 'too_long' or issue == 'not_in_median_lengths':
+            warning_parts.append(details)
+        elif issue == 'OK':
+            pass
+        else:
+            warning_parts.append('Unknown issue')
+        
+        if translation_status == 'FAIL':
+            warning_parts.append('Translation issue')
+        
+        warning_msg = ', '.join(warning_parts) if warning_parts else 'OK'
+        
+        return {
+            'sequence_name': sequence_name,
+            'gene_name': gene_name,
+            'annotation_length': annotation_length,
+            'median_length': median_length,
+            'copies': copies,
+            'warning_msg': warning_msg,
+            'translation_details': translation_details
+        }
+    
+    def add_missing_genes_to_reports(missing_genes, sequence_names, sample_tsv_lines, combined_tsv_lines):
+        """Add missing genes to both individual and combined reports."""
+        missing_count = 0
+        for missing_gene in missing_genes:
+            median_length = gene_median_lengths.get(missing_gene, 'NA')
+            for seq_name in sequence_names:
+                missing_row = format_tsv_row(
+                    seq_name, missing_gene, 'NA', median_length, min_threshold, 
+                    max_threshold, 'NA', 'Missing', 'NA'
+                )
+                combined_tsv_lines.append('\t'.join(missing_row))
+                sample_tsv_lines.append('\t'.join(missing_row))
+                missing_count += 1
+        return missing_count
 
     logger.info(f"{"[INFO]:":10} Writing gene validation reports to: {report_directory}\n")
     
     # Prepare combined TSV data
-    combined_tsv_lines = [
-        "Sample\tGene_ID\tGene_Name\tActual_Length\tMedian_Length_Refs\tMin_Threshold\tMax_Threshold\tCopies\tCopy_Lengths\tWarning\tTranslation_Details"]
-
+    combined_tsv_lines = ['\t'.join(create_tsv_header())]
     total_warnings_in_reports = 0
 
     # Process each sample
     for sample_name, result in all_results.items():
         if 'error' in result:
             # Add error row to combined report
-            combined_tsv_lines.append(f"{sample_name}\tERROR\tERROR\t0\t0\t{min_threshold}\t{max_threshold}\t0\t\t{result['error']}\tERROR")
+            error_row = format_tsv_row(
+                sample_name, 'ERROR', 0, 0, min_threshold, max_threshold, 
+                0, result['error'], 'ERROR'
+            )
+            combined_tsv_lines.append('\t'.join(error_row))
             continue
         
-        # Get gene results from the result (this is the correct structure)
-        gene_results = result.get('gene_results', {})
+        # Get sequence data
+        sequence_gene_data = result.get('sequence_gene_data', {})
         
-        logger.debug(f"{"[DEBUG]:":10} Processing {sample_name}: found {len(gene_results)} genes")
+        # Count total genes across all sequences
+        total_genes_count = sum(len(seq_data['sequence_gene_data']) for seq_data in sequence_gene_data.values())
+        logger.debug(f"{"[DEBUG]:":10} Processing {sample_name}: found {total_genes_count} genes across {len(sequence_gene_data)} sequences")
         
         # Prepare individual sample report
-        sample_tsv_lines = [
-            "Gene_ID\tGene_Name\tActual_Length\tMedian_Length_Refs\tMin_Threshold\tMax_Threshold\tCopies\tCopy_Lengths\tWarning\tTranslation_Details"]
-
-        # Process all genes for this sample
-        logger.debug(f"{"[DEBUG]:":10} Processing {len(gene_results)} genes for {sample_name}")
+        sample_tsv_lines = ['\t'.join(create_tsv_header())]
+        
         warnings_found = 0
         missing_genes_count = 0
         
-        for gene_name, gene_info in sorted(gene_results.items()):
-            actual_length = gene_info['actual_length']
-            copies = gene_info['copies']
-            copy_lengths = gene_info['copy_lengths']
-            copy_lengths_str = ','.join(map(str, copy_lengths))
+        # Process all genes from sequence data
+        sequence_names = list(sequence_gene_data.keys())
+        for seq_name, seq_data in sequence_gene_data.items():
+            gene_info_dict = seq_data['sequence_gene_data']
             
-            # Get median length and determine warning status
-            median_length = gene_info.get('median_length')
-            issue = gene_info.get('issue', 'unknown')
-            details = gene_info.get('details', '')
-            translation_status = gene_info.get('translation_status', 'OK')
-            translation_details = gene_info.get('translation_details', '')
-            
-            # Determine warning message based on issue and translation status
-
-            warning_msg = []
-            if issue == 'too_short':
-                warning_msg.append(details)
-                warnings_found += 1
-                total_warnings_in_reports += 1
-            if issue == 'too_long':
-                warning_msg.append(details)
-                warnings_found += 1
-                total_warnings_in_reports += 1
-            if issue == 'not_in_median_lengths':
-                warning_msg.append(details)
-                warnings_found += 1
-                total_warnings_in_reports += 1
-            if translation_status == 'FAIL':
-                warning_msg.append("Translation issue")
-                warnings_found += 1
-                total_warnings_in_reports += 1
-
-            if warning_msg:
-                warning_msg = ", ".join(warning_msg)
-            else:
-                warning_msg = "OK"
-            
-            # Add to both combined and individual reports
-            combined_tsv_lines.append(f"{sample_name}\t{gene_name}\t{gene_name}\t{actual_length}\t{median_length or 'NA'}\t{min_threshold}\t{max_threshold}\t{copies}\t{copy_lengths_str}\t{warning_msg}\t{translation_details}")
-            sample_tsv_lines.append(f"{gene_name}\t{gene_name}\t{actual_length}\t{median_length or 'NA'}\t{min_threshold}\t{max_threshold}\t{copies}\t{copy_lengths_str}\t{warning_msg}\t{translation_details}")
+            for gene_name, gene_info in sorted(gene_info_dict.items()):
+                gene_data = process_gene_data(gene_name, gene_info, seq_name)
+                
+                # Count warnings
+                if gene_data['warning_msg'] != 'OK':
+                    warnings_found += 1
+                    total_warnings_in_reports += 1
+                
+                # Add to reports
+                row = format_tsv_row(
+                    gene_data['sequence_name'], gene_data['gene_name'], 
+                    gene_data['annotation_length'], gene_data['median_length'],
+                    min_threshold, max_threshold, gene_data['copies'],
+                    gene_data['warning_msg'],
+                    gene_data['translation_details']
+                )
+                combined_tsv_lines.append('\t'.join(row))
+                sample_tsv_lines.append('\t'.join(row))
         
-        # Add missing genes to reports
+        # Add missing genes
         missing_genes = result.get('missing_genes', [])
-        for missing_gene in missing_genes:
-            median_length = gene_median_lengths.get(missing_gene, 'NA')
-            # Add missing gene to both combined and individual reports
-            combined_tsv_lines.append(f"{sample_name}\t{missing_gene}\t{missing_gene}\tNA\t{median_length}\t{min_threshold}\t{max_threshold}\tNA\tNA\tMissing\tNA")
-            sample_tsv_lines.append(f"{missing_gene}\t{missing_gene}\tNA\t{median_length}\t{min_threshold}\t{max_threshold}\tNA\tNA\tMissing\tNA")
-            missing_genes_count += 1
-            total_warnings_in_reports += 1
+        missing_genes_count = add_missing_genes_to_reports(
+            missing_genes, sequence_names, sample_tsv_lines, combined_tsv_lines
+        )
+        total_warnings_in_reports += missing_genes_count
         
         # Write individual sample report
         sample_report_file = os.path.join(report_directory, f"{sample_name}_gene_validation_report.tsv")
         with open(sample_report_file, 'w') as f:
-            f.write("\n".join(sample_tsv_lines))
+            f.write('\n'.join(sample_tsv_lines))
         
         logger.info(f"{" ":15} Sample {sample_name}: ({len(sample_tsv_lines)-1} genes, {warnings_found} warnings, {missing_genes_count} missing genes)")
     
@@ -775,7 +886,7 @@ def write_gene_length_report(all_results, logger, min_threshold, max_threshold, 
     # Write combined TSV file
     combined_report_file = os.path.join(report_directory, "all_samples_gene_validation_report.tsv")
     with open(combined_report_file, 'w') as f:
-        f.write("\n".join(combined_tsv_lines))
+        f.write('\n'.join(combined_tsv_lines))
 
 
 def check_no_alignment_and_refs_order(args, gene_median_lengths, gene_synonyms=None):
@@ -1455,26 +1566,33 @@ def generate_cds_alignments(all_sample_results, ref_gene_seqrecords, output_dire
         sample_alignments_dir = os.path.join(outdir_alignments, sample_name)
         os.makedirs(sample_alignments_dir, exist_ok=True)
             
-        gene_results = result.get('gene_results', {})
         gene_cds_info = result.get('gene_cds_info', {})
         
-        for gene_name, gene_info in gene_results.items():
-            # Only create alignments for genes that have CDS info and are in reference
-            if gene_name in gene_cds_info:
-                if gene_name in ref_gene_seqrecords:
-                    cds_info_list = gene_cds_info[gene_name]
-                    ref_sequences = ref_gene_seqrecords[gene_name]
+        # Group genes by base name (without copy suffix) to handle multiple copies
+        gene_groups = {}
+        for gene_name, cds_info_list in gene_cds_info.items():
+            # Extract base gene name (remove _copy_N suffix if present)
+            base_gene_name = gene_name.split('_copy_')[0]
+            
+            if base_gene_name not in gene_groups:
+                gene_groups[base_gene_name] = []
+            gene_groups[base_gene_name].extend(cds_info_list)
+        
+        for base_gene_name, all_cds_info in gene_groups.items():
+            # Only create alignments for genes that are in reference
+            if base_gene_name in ref_gene_seqrecords:
+                ref_sequences = ref_gene_seqrecords[base_gene_name]
 
-                    alignment_tasks.append({
-                        'sample_name': sample_name,
-                        'gene_name': gene_name,
-                        'cds_info_list': cds_info_list,
-                        'ref_sequences': ref_sequences,
-                        'outdir_alignments': sample_alignments_dir,  # Use sample-specific directory
-                        'threads': threads
-                    })
-                else:
-                    logger.warning(f"{"[WARNING]:":10} No reference sequences found for gene {gene_name}")
+                alignment_tasks.append({
+                    'sample_name': sample_name,
+                    'gene_name': base_gene_name,
+                    'cds_info_list': all_cds_info,
+                    'ref_sequences': ref_sequences,
+                    'outdir_alignments': sample_alignments_dir,  # Use sample-specific directory
+                    'threads': threads
+                })
+            else:
+                logger.warning(f"{"[WARNING]:":10} No reference sequences found for gene {base_gene_name}")
     
     if not alignment_tasks:
         logger.info(f"{"[INFO]:":10} No CDS alignment tasks found")
@@ -1501,7 +1619,7 @@ def generate_cds_alignments(all_sample_results, ref_gene_seqrecords, output_dire
             if success:
                 logger.debug(f"{"[DEBUG]:":10} {task_id}: {result}")
             else:
-                raise result[0]
+                utils.log_manager.handle_error(result[0], result[1], "create_single_cds_alignment()", task_id)
 
     logger.debug(f"{"[DEBUG]:":10} CDS alignment generation complete")
 
@@ -1654,28 +1772,33 @@ def generate_rRNA_alignments(all_sample_results, ref_gene_seqrecords, output_dir
         sample_alignments_dir = os.path.join(outdir_alignments, sample_name)
         os.makedirs(sample_alignments_dir, exist_ok=True)
             
-        gene_results = result.get('gene_results', {})
         gene_rRNA_info = result.get('gene_rRNA_info', {})
         
-        for gene_name, gene_info in gene_results.items():
+        # Group genes by base name (without copy suffix) to handle multiple copies
+        gene_groups = {}
+        for gene_name, rRNA_info_list in gene_rRNA_info.items():
+            # Extract base gene name (remove _copy_N suffix if present)
+            base_gene_name = gene_name.split('_copy_')[0]
+            
+            if base_gene_name not in gene_groups:
+                gene_groups[base_gene_name] = []
+            gene_groups[base_gene_name].extend(rRNA_info_list)
+        
+        for base_gene_name, all_rRNA_info in gene_groups.items():
+            # Only create alignments for genes that are in reference
+            if base_gene_name in ref_gene_seqrecords:
+                ref_sequences = ref_gene_seqrecords[base_gene_name]
 
-            # Only create alignments for genes that have rRNA info and are in reference
-            if gene_name in gene_rRNA_info:
-
-                if gene_name in ref_gene_seqrecords:
-                    rRNA_info_list = gene_rRNA_info[gene_name]
-                    ref_sequences = ref_gene_seqrecords[gene_name]
-
-                    alignment_tasks.append({
-                        'sample_name': sample_name,
-                        'gene_name': gene_name,
-                        'rRNA_info_list': rRNA_info_list,
-                        'ref_sequences': ref_sequences,
-                        'outdir_alignments': sample_alignments_dir,  # Use sample-specific directory
-                        'threads': threads
-                    })
-                else:
-                    logger.debug(f"{"[DEBUG]:":10} No reference sequences found for rRNA gene {gene_name}")
+                alignment_tasks.append({
+                    'sample_name': sample_name,
+                    'gene_name': base_gene_name,
+                    'rRNA_info_list': all_rRNA_info,
+                    'ref_sequences': ref_sequences,
+                    'outdir_alignments': sample_alignments_dir,  # Use sample-specific directory
+                    'threads': threads
+                })
+            else:
+                logger.debug(f"{"[DEBUG]:":10} No reference sequences found for rRNA gene {base_gene_name}")
     
     if not alignment_tasks:
         logger.warning(f"{"[WARNING]:":10} No rRNA alignment tasks found")
@@ -1702,7 +1825,7 @@ def generate_rRNA_alignments(all_sample_results, ref_gene_seqrecords, output_dir
             if success:
                 logger.debug(f"{"[DEBUG]:":10} {task_id}: {result}")
             else:
-                raise result[0]
+                utils.log_manager.handle_error(result[0], result[1], "create_single_rRNA_alignment()", task_id)
 
     logger.debug(f"{"[DEBUG]:":10} rRNA alignment generation complete")
 
@@ -1737,30 +1860,33 @@ def generate_tRNA_alignments(all_sample_results, ref_gene_seqrecords, output_dir
         sample_alignments_dir = os.path.join(outdir_alignments, sample_name)
         os.makedirs(sample_alignments_dir, exist_ok=True)
             
-        gene_results = result.get('gene_results', {})
         gene_tRNA_info = result.get('gene_tRNA_info', {})
         
-        for gene_name, gene_info in gene_results.items():
+        # Group genes by base name (without copy suffix) to handle multiple copies
+        gene_groups = {}
+        for gene_name, tRNA_info_list in gene_tRNA_info.items():
+            # Extract base gene name (remove _copy_N suffix if present)
+            base_gene_name = gene_name.split('_copy_')[0]
+            
+            if base_gene_name not in gene_groups:
+                gene_groups[base_gene_name] = []
+            gene_groups[base_gene_name].extend(tRNA_info_list)
+        
+        for base_gene_name, all_tRNA_info in gene_groups.items():
+            # Only create alignments for genes that are in reference
+            if base_gene_name in ref_gene_seqrecords:
+                ref_sequences = ref_gene_seqrecords[base_gene_name]
 
-            # Only create alignments for genes that have tRNA info and are in reference
-            if gene_name in gene_tRNA_info:
-
-                if gene_name in ref_gene_seqrecords:
-
-
-                    tRNA_info_list = gene_tRNA_info[gene_name]
-                    ref_sequences = ref_gene_seqrecords[gene_name]
-
-                    alignment_tasks.append({
-                        'sample_name': sample_name,
-                        'gene_name': gene_name,
-                        'tRNA_info_list': tRNA_info_list,
-                        'ref_sequences': ref_sequences,
-                        'outdir_alignments': sample_alignments_dir,  # Use sample-specific directory
-                        'threads': threads
-                    })
-                else:
-                    logger.debug(f"{"[DEBUG]:":10} No reference sequences found for tRNA gene {gene_name}")
+                alignment_tasks.append({
+                    'sample_name': sample_name,
+                    'gene_name': base_gene_name,
+                    'tRNA_info_list': all_tRNA_info,
+                    'ref_sequences': ref_sequences,
+                    'outdir_alignments': sample_alignments_dir,  # Use sample-specific directory
+                    'threads': threads
+                })
+            else:
+                logger.debug(f"{"[DEBUG]:":10} No reference sequences found for tRNA gene {base_gene_name}")
     
     if not alignment_tasks:
         logger.warning(f"{"[WARNING]:":10} No tRNA alignment tasks found")
@@ -1787,7 +1913,7 @@ def generate_tRNA_alignments(all_sample_results, ref_gene_seqrecords, output_dir
             if success:
                 logger.debug(f"{"[DEBUG]:":10} {task_id}: {result}")
             else:
-                raise result[0]
+                utils.log_manager.handle_error(result[0], result[1], "create_single_tRNA_alignment()", task_id)
 
     logger.debug(f"{"[DEBUG]:":10} tRNA alignment generation complete")
 
@@ -1827,15 +1953,11 @@ def create_single_per_gene_alignment(task_data):
             # Check for internal stop codons in sample sequences
             has_internal_stops = False
             for seqrecord in all_sample_sequences:
-                try:
-                    translated = utils.pad_seq(seqrecord)[0].translate()
-                    if "*" in str(translated.seq)[:-1]:  # Exclude the last position
-                        has_internal_stops = True
-                        break
-                except:
+                translated = utils.pad_seq(seqrecord)[0].translate()
+                if "*" in str(translated.seq)[:-1]:  # Exclude the last position
                     has_internal_stops = True
                     break
-
+                    
             if has_internal_stops:
                 # Align nucleotide sequences directly using mafft
                 with tempfile.NamedTemporaryFile(mode='w', suffix='.fasta', delete=False) as temp_nucleotide:
@@ -1886,9 +2008,7 @@ def create_single_per_gene_alignment(task_data):
                     # Backtranslate using trimal
                     subprocess.run(['trimal', '-backtrans', temp_nucleotide_path, '-in', aligned_protein_file, '-out', alignment_file, '-ignorestopcodon'], 
                                  stderr=subprocess.PIPE, check=True)
-                    # subprocess.run(['trimal', '-backtrans', temp_nucleotide_path, '-in', aligned_protein_file, '-out', alignment_file, ], 
-                    #              stderr=subprocess.PIPE, check=True)
-                    
+
                     return True, f"Created backtranslated alignment for {gene_name} (all samples)"
                     
                 except Exception as e:
@@ -1970,7 +2090,7 @@ def generate_per_gene_alignments(all_sample_results, ref_gene_seqrecords, output
     
     # Collect all gene sequences from all samples
     gene_sequences = {}  # gene_name -> list of SeqRecord objects
-    gene_types = {}      # gene_name -> 'CDS' or 'rRNA'
+    gene_types = {}      # gene_name -> 'CDS', 'rRNA', or 'tRNA'
     
     for sample_name, result in all_sample_results.items():
         if 'error' in result:
@@ -1982,36 +2102,45 @@ def generate_per_gene_alignments(all_sample_results, ref_gene_seqrecords, output
         
         # Process CDS genes
         for gene_name, cds_info_list in gene_cds_info.items():
-            if gene_name not in gene_sequences:
-                gene_sequences[gene_name] = []
-                gene_types[gene_name] = 'CDS'
+            # Extract base gene name (remove _copy_N suffix if present)
+            base_gene_name = gene_name.split('_copy_')[0]
+            
+            if base_gene_name not in gene_sequences:
+                gene_sequences[base_gene_name] = []
+                gene_types[base_gene_name] = 'CDS'
             
             for i, cds_info in enumerate(cds_info_list):
                 seq = cds_info['cds_seq']
-                seqrecord = SeqRecord(seq=seq, id=f"{sample_name}_{gene_name}_copy_{i+1}", description=f"CDS from {sample_name}")
-                gene_sequences[gene_name].append(seqrecord)
+                seqrecord = SeqRecord(seq=seq, id=f"{sample_name}_{base_gene_name}_copy_{i+1}", description=f"CDS from {sample_name}")
+                gene_sequences[base_gene_name].append(seqrecord)
         
         # Process rRNA genes
         for gene_name, rRNA_info_list in gene_rRNA_info.items():
-            if gene_name not in gene_sequences:
-                gene_sequences[gene_name] = []
-                gene_types[gene_name] = 'rRNA'
+            # Extract base gene name (remove _copy_N suffix if present)
+            base_gene_name = gene_name.split('_copy_')[0]
+            
+            if base_gene_name not in gene_sequences:
+                gene_sequences[base_gene_name] = []
+                gene_types[base_gene_name] = 'rRNA'
             
             for i, rRNA_info in enumerate(rRNA_info_list):
                 seq = rRNA_info['rRNA_seq']
-                seqrecord = SeqRecord(seq=seq, id=f"{sample_name}_{gene_name}_copy_{i+1}", description=f"rRNA from {sample_name}")
-                gene_sequences[gene_name].append(seqrecord)
+                seqrecord = SeqRecord(seq=seq, id=f"{sample_name}_{base_gene_name}_copy_{i+1}", description=f"rRNA from {sample_name}")
+                gene_sequences[base_gene_name].append(seqrecord)
         
         # Process tRNA genes
         for gene_name, tRNA_info_list in gene_tRNA_info.items():
-            if gene_name not in gene_sequences:
-                gene_sequences[gene_name] = []
-                gene_types[gene_name] = 'tRNA'
+            # Extract base gene name (remove _copy_N suffix if present)
+            base_gene_name = gene_name.split('_copy_')[0]
+            
+            if base_gene_name not in gene_sequences:
+                gene_sequences[base_gene_name] = []
+                gene_types[base_gene_name] = 'tRNA'
             
             for i, tRNA_info in enumerate(tRNA_info_list):
                 seq = tRNA_info['tRNA_seq']
-                seqrecord = SeqRecord(seq=seq, id=f"{sample_name}_{gene_name}_copy_{i+1}", description=f"tRNA from {sample_name}")
-                gene_sequences[gene_name].append(seqrecord)
+                seqrecord = SeqRecord(seq=seq, id=f"{sample_name}_{base_gene_name}_copy_{i+1}", description=f"tRNA from {sample_name}")
+                gene_sequences[base_gene_name].append(seqrecord)
     
     # Prepare alignment tasks
     alignment_tasks = []
@@ -2056,7 +2185,7 @@ def generate_per_gene_alignments(all_sample_results, ref_gene_seqrecords, output
             if success:
                 logger.debug(f"{"[DEBUG]:":10} {task_id}: {result}")
             else:
-                raise result[0]
+                utils.log_manager.handle_error(result[0], result[1], "generate_per_gene_alignments()", task_id)
 
     logger.debug(f"{"[DEBUG]:":10} Per-gene alignment generation complete")
 
@@ -2066,7 +2195,7 @@ def align_genes(all_sample_results, ref_gene_seqrecords, output_directory, pool_
     Generate alignments for annotated genes with reference genes.
     
     Args:
-        all_sample_results (dict): Results from gene checking (contains gene_results for each sample)
+        all_sample_results (dict): Results from gene checking (contains sequence_gene_data for each sample)
         ref_gene_seqrecords (dict): Dictionary of reference gene sequences
         output_directory (str): Directory to write the output files
         pool_size (int): Number of processes to use for multiprocessing
@@ -2085,7 +2214,78 @@ def align_genes(all_sample_results, ref_gene_seqrecords, output_directory, pool_
     utils.log_separator(logger)
 
 
-def linearise_genome_upstream_gene(gbk_file, fasta_file, output_dir, sample_name, linearise_gene='psbA'):
+def detect_multi_sequence_fasta(fasta_file, logger=None):
+    """
+    Detect if a FASTA file contains multiple sequences.
+    
+    Args:
+        fasta_file (str): Path to the FASTA file
+        logger: Logger object (optional)
+        
+    Returns:
+        tuple: (is_multi_sequence, sequence_count)
+    """
+    try:
+        sequence_count = 0
+        with open(fasta_file, 'r') as handle:
+            for record in SeqIO.parse(handle, 'fasta'):
+                sequence_count += 1
+                if sequence_count > 1:
+                    return True, sequence_count
+        
+        return False, sequence_count
+        
+    except Exception as e:
+        if logger:
+            logger.error(f"{"[ERROR]:":10} Failed to detect sequences in {fasta_file}: {str(e)}")
+        return False, 0
+
+
+def split_multi_sequence_fasta(fasta_file, output_dir, filename_prefix, logger=None):
+    """
+    Split a FASTA file containing multiple sequences into separate files.
+    
+    Args:
+        fasta_file (str): Path to the input FASTA file
+        output_dir (str): Directory to write individual sequence files
+        filename_prefix (str): Base filename prefix for the sequences
+        logger: Logger object (optional)
+        
+    Returns:
+        list: List of paths to individual sequence files
+    """
+    sequence_files = []
+    sequence_count = 0
+    
+    try:
+        with open(fasta_file, 'r') as handle:
+            for record in SeqIO.parse(handle, 'fasta'):
+                sequence_count += 1
+                
+                # Create a safe sequence name (replace spaces and special chars)
+                safe_seq_name = str(record.id).replace(' ', '_').replace(':', '_').replace('|', '_')
+                
+                # Create individual sequence file
+                seq_filename = f"{filename_prefix}_seq{sequence_count:03d}_{safe_seq_name}.fasta"
+                seq_filepath = os.path.join(output_dir, seq_filename)
+                
+                # Write individual sequence to file
+                with open(seq_filepath, 'w') as seq_handle:
+                    SeqIO.write(record, seq_handle, 'fasta')
+                
+                sequence_files.append(seq_filepath)
+                
+        if logger:
+            logger.debug(f"{"[DEBUG]:":10} Split {fasta_file} into {sequence_count} individual sequence files")
+        return sequence_files
+        
+    except Exception as e:
+        if logger:
+            logger.error(f"{"[ERROR]:":10} Failed to split multi-sequence FASTA file {fasta_file}: {str(e)}")
+        return []
+
+
+def linearise_genome_upstream_gene(gbk_file, fasta_file, output_dir, sample_name, linearise_gene='psbA', logger=None):
     """
     Linearise genome upstream of specified gene and write new fasta file.
     
@@ -2095,7 +2295,8 @@ def linearise_genome_upstream_gene(gbk_file, fasta_file, output_dir, sample_name
         output_dir (str): Output directory for linearised fasta
         sample_name (str): Sample name for output file
         linearise_gene (str): Gene name to use for linearisation (default: 'psbA')
-        
+        logger: Logger instance for logging messages
+
     Returns:
         str: Path to the new linearised fasta file
     """
@@ -2113,7 +2314,7 @@ def linearise_genome_upstream_gene(gbk_file, fasta_file, output_dir, sample_name
                     break
         
         if gene_start is None:
-            logger.warning(f"{"[WARNING]:":10} {linearise_gene} gene not found in {sample_name}, using original sequence")
+            logger.debug(f"{"[DEBUG]:":10} {linearise_gene} gene not found in {sample_name}, using original sequence")
             return fasta_file
         
         # Read original fasta sequence
@@ -2132,7 +2333,7 @@ def linearise_genome_upstream_gene(gbk_file, fasta_file, output_dir, sample_name
         )
         
         # Write linearised fasta file
-        linearised_fasta = os.path.join(output_dir, f"{sample_name}_linearised.fasta")
+        linearised_fasta = os.path.join(output_dir, f"{sample_name}.round2.fasta")
         with open(linearised_fasta, 'w') as handle:
             SeqIO.write(linearised_record, handle, 'fasta')
         
@@ -2144,7 +2345,170 @@ def linearise_genome_upstream_gene(gbk_file, fasta_file, output_dir, sample_name
         return fasta_file
 
 
-def annotate_genomes(genome_fasta_dir, output_directory, chloe_project_dir=None, chloe_script_path=None, linearise_gene='psbA', metadata_dict=None):
+def process_single_sequence(fasta_file, output_dir, sequence_name, chloe_project_dir, chloe_script_path, linearise_gene, metadata_dict, 
+                            original_fasta_name, logger=None):
+    """
+    Process a single sequence file with Chloë annotation.
+    
+    Args:
+        fasta_file (str): Path to the sequence FASTA file
+        output_dir (str): Output directory for this sequence
+        sequence_name (str): Name for this sequence
+        chloe_project_dir (str): Chloë project directory
+        chloe_script_path (str): Chloë script path
+        linearise_gene (str): Gene to use for linearisation
+        metadata_dict (dict): Metadata dictionary
+        original_fasta_name (str): Original multi-sequence filename for metadata lookup
+        logger: Logger instance for logging messages
+        
+    Returns:
+        dict: Dictionary with file paths for this sequence
+    """
+    # Define output file paths for this sequence
+    output_gbk = os.path.join(output_dir, f"{sequence_name}.chloe.gbk")
+    output_gff = os.path.join(output_dir, f"{sequence_name}.chloe.gff")
+    output_gbk_original = os.path.join(output_dir, f"{sequence_name}.round1.chloe.gbk")
+    output_gff_original = os.path.join(output_dir, f"{sequence_name}.round1.chloe.gff")
+    output_gbk_linearised = os.path.join(output_dir, f"{sequence_name}.round2.chloe.gbk")
+    output_gff_linearised = os.path.join(output_dir, f"{sequence_name}.round2.chloe.gff")
+    output_fasta_linearised = os.path.join(output_dir, f"{sequence_name}.round2.fasta")
+
+    # Remove any existing non-renamed files
+    if os.path.exists(output_gbk):
+        os.remove(output_gbk)
+    if os.path.exists(output_gff):
+        os.remove(output_gff)
+
+    # Determine what needs to be done
+    has_original_annotation = utils.file_exists_and_not_empty(output_gbk_original) and utils.file_exists_and_not_empty(output_gff_original)
+    has_linearised_annotation_and_fasta = utils.file_exists_and_not_empty(output_gbk_linearised) and utils.file_exists_and_not_empty(output_gff_linearised) and utils.file_exists_and_not_empty(output_fasta_linearised)
+    
+    if has_linearised_annotation_and_fasta:
+        logger.debug(f"{"[INFO]:":10} {sequence_name} already completely processed with linearised sequence")
+    elif has_original_annotation:
+        logger.debug(f"{"[INFO]:":10} {sequence_name} needs linearisation and re-annotation")
+    else:
+        logger.debug(f"{"[INFO]:":10} {sequence_name} needs initial annotation")
+
+    # Resolve chloe project and script paths
+    if (chloe_project_dir is None) != (chloe_script_path is None):
+        logger.error(f"{"[ERROR]:":10} Both --chloe_project_dir and --chloe_script must be provided together.")
+        utils.exit_program()
+
+    if chloe_project_dir and chloe_script_path:
+        chloe_project = f'--project={chloe_project_dir}'
+        chloe_script = chloe_script_path
+    else:
+        try:
+            conda_prefix = os.environ['CONDA_PREFIX']
+        except KeyError:
+            conda_prefix = None
+
+        if not conda_prefix:
+            if logger:
+                logger.error(f"{"[ERROR]:":10} Cannot locate chloe project/script without CONDA_PREFIX or user-specified paths")
+            utils.exit_program()
+
+        chloe_project = f'--project={conda_prefix}/bin/chloe'
+        chloe_script = f'{conda_prefix}/bin/chloe/chloe.jl'
+
+    # Run chloe annotate command
+    cmd = [
+        'julia',
+        chloe_project,
+        chloe_script,
+        'annotate',
+        '--no-filter',
+        '--no-transform',
+        '--gbk',
+        '--output',
+        output_dir,
+        fasta_file
+    ]
+
+    # Execute annotation workflow
+    if not has_original_annotation:
+        # Do initial annotation
+        logger.debug(f"{"[INFO]:":10} Performing initial annotation for {sequence_name}")
+
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            check=True
+        )
+
+        # Rename original annotation files to preserve original annotation
+        if os.path.exists(output_gbk):
+            os.rename(output_gbk, output_gbk_original)
+        if os.path.exists(output_gff):
+            os.rename(output_gff, output_gff_original)
+
+        has_original_annotation = True
+
+    # Check metadata to determine if linearisation should be skipped
+    should_linearise = True
+    successful_linearisation = False
+    if metadata_dict:
+        # Use original multi-sequence filename for metadata lookup
+        if original_fasta_name in metadata_dict:
+            topology = metadata_dict[original_fasta_name].get('linear_or_circular', 'circular')
+            if topology == 'linear':
+                should_linearise = False
+                logger.debug(f"{"[INFO]:":10} Skipping linearisation for {sequence_name} - already marked as linear in metadata")
+
+    # Linearise and re-annotate (if we have original annotation but no linearised and sample should be linearised)
+    if has_original_annotation and not has_linearised_annotation_and_fasta and should_linearise:
+        logger.debug(f"{"[INFO]:":10} Linearising {sequence_name} upstream of {linearise_gene}...")
+        
+        # Linearise the genome upstream of the specified gene
+        output_fasta_linearised = linearise_genome_upstream_gene(
+            output_gbk_original, 
+            fasta_file, 
+            output_dir, 
+            sequence_name,
+            linearise_gene,
+            logger
+        )
+
+        if output_fasta_linearised != fasta_file:
+            successful_linearisation = True
+            # Re-run chloe with linearised fasta
+            cmd[9] = output_fasta_linearised  # Replace the fasta file in the command
+
+            if logger:
+                logger.debug(f"{"[DEBUG]:":10} Re-annotating {sequence_name} with linearised sequence")
+            
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                check=True
+            )
+
+            if logger:
+                logger.debug(f"{"[DEBUG]:":10} Re-annotation complete for {sequence_name}")
+
+    elif has_original_annotation and has_linearised_annotation_and_fasta:
+        successful_linearisation = True
+
+    # Return the appropriate file paths
+    if should_linearise and successful_linearisation:
+        return {
+            'gbk': output_gbk_linearised,
+            'gff': output_gff_linearised,
+            'fasta': output_fasta_linearised
+        }
+    else:
+        return {
+            'gbk': output_gbk_original,
+            'gff': output_gff_original,
+            'fasta': fasta_file
+        }
+
+
+def annotate_genomes(genome_fasta_dir, output_directory, chloe_project_dir=None, chloe_script_path=None, linearise_gene='psbA', 
+                     metadata_dict=None, pool_size=1, log_queue=None):
     """
     Annotate genome fasta files using chloe annotate command.
     
@@ -2157,6 +2521,8 @@ def annotate_genomes(genome_fasta_dir, output_directory, chloe_project_dir=None,
         metadata_dict (dict, optional): Metadata dictionary mapping fasta filenames to metadata.
                                       Used to check linear_or_circular status to skip linearisation
                                       for samples already marked as linear.
+        pool_size (int, optional): Number of processes to use for multiprocessing. Defaults to 1.
+        log_queue (queue.Queue, optional): Multiprocessing-safe queue for logging messages.
         
     Returns:
         dict: Dictionary mapping sample names to their annotation file paths
@@ -2184,7 +2550,6 @@ def annotate_genomes(genome_fasta_dir, output_directory, chloe_project_dir=None,
         utils.exit_program()
     
     # Print fasta files to annotate
-    # utils.log_separator(logger)
     logger.info(f"{"[INFO]:":10} Found {len(fasta_files)} fasta files to annotate:")
     for fasta_file in fasta_files:
         logger.info(f"{" ":10} {os.path.basename(fasta_file)}")
@@ -2193,8 +2558,54 @@ def annotate_genomes(genome_fasta_dir, output_directory, chloe_project_dir=None,
 
     annotated_genomes = dict({})
     
-    # Process each fasta file
-    for fasta_file in tqdm(fasta_files, desc=f"{"[INFO]:":10} {"Annotating genomes":<20}", file=sys.stdout):
+    # Process files with multiprocessing
+    logger.info(f"{"[INFO]:":10} Processing {len(fasta_files)} FASTA files with {pool_size} processes")
+    
+    with ProcessPoolExecutor(max_workers=pool_size) as executor:
+        # Submit all tasks
+        future_to_file = {
+            executor.submit(process_single_fasta_file, fasta_file, annotated_genomes_dir, chloe_project_dir, chloe_script_path, 
+                            linearise_gene, metadata_dict, log_queue): fasta_file
+            for fasta_file in fasta_files
+        }
+        
+        # Process results with progress bar
+        for future in tqdm(as_completed(future_to_file), total=len(future_to_file), desc=f"{"[INFO]:":10} {"Annotating genomes":<20}", file=sys.stdout):
+            fasta_file = future_to_file[future]
+            
+            success, result = future.result()
+                
+            if success:
+                sample_name, sample_data = result
+                annotated_genomes[sample_name] = sample_data
+                logger.debug(f"{"[DEBUG]:":10} Successfully processed {sample_name}")
+            else:
+                utils.log_manager.handle_error(result[0], result[1], 'annotate_genomes()', fasta_file)
+                                               
+    utils.log_separator(logger)
+    time.sleep(0.1)
+
+    return annotated_genomes
+
+
+def process_single_fasta_file(fasta_file, annotated_genomes_dir, chloe_project_dir, chloe_script_path, linearise_gene, metadata_dict, log_queue=None):
+    """
+    Process a single FASTA file with annotation (worker function for multiprocessing).
+    
+    Args:
+        fasta_file (str): Path to the FASTA file to process
+        annotated_genomes_dir (str): Directory for annotated genomes
+        chloe_project_dir (str): Chloë project directory
+        chloe_script_path (str): Chloë script path
+        linearise_gene (str): Gene to use for linearisation
+        metadata_dict (dict): Metadata dictionary
+        log_queue (queue.Queue, optional): Multiprocessing-safe queue for logging
+        
+    Returns:
+        tuple: (success, result) where success is bool and result is either (sample_name, sample_data) or error info
+    """
+    try:
+        worker_logger = utils.setup_worker_logger(__name__, log_queue)
         
         # Get the basename and filename prefix
         basename = os.path.basename(fasta_file)
@@ -2210,156 +2621,105 @@ def annotate_genomes(genome_fasta_dir, output_directory, chloe_project_dir=None,
 
         filename_prefix_no_dots = filename_prefix.replace('.', '_')
 
-        # Initialise dict for sample data
-        annotated_genomes[filename_prefix_no_dots] = {}
-
-        # Add the orginal fasta file to the annotated_genomes dict for later metadata checking
-        annotated_genomes[filename_prefix_no_dots]['original_fasta'] = basename
+        # Check if this is a multi-sequence FASTA file
+        is_multi_sequence, sequence_count = detect_multi_sequence_fasta(fasta_file, worker_logger)
         
-        # Define output gbk file path
-        output_sample_dir = os.path.join(annotated_genomes_dir, filename_prefix_no_dots)
-        os.makedirs(output_sample_dir, exist_ok=True)
-
-        # Define output file paths
-        output_sample_gbk = os.path.join(output_sample_dir, f"{filename_prefix}.chloe.gbk")
-        output_sample_gff = os.path.join(output_sample_dir, f"{filename_prefix}.chloe.gff")
-        output_sample_gbk_original = os.path.join(output_sample_dir, f"{filename_prefix}.chloe.original.gbk")
-        output_sample_gff_original = os.path.join(output_sample_dir, f"{filename_prefix}.chloe.original.gff")
-        output_sample_gbk_linearised = os.path.join(output_sample_dir, f"{filename_prefix}_linearised.chloe.gbk")
-        output_sample_gff_linearised = os.path.join(output_sample_dir, f"{filename_prefix}_linearised.chloe.gff")
-        output_sample_fasta_linearised = os.path.join(output_sample_dir, f"{filename_prefix}_linearised.fasta")
-
-        # Remove any existing non-renamed files
-        if os.path.exists(output_sample_gbk):
-            os.remove(output_sample_gbk)
-        if os.path.exists(output_sample_gff):
-            os.remove(output_sample_gff)
-
-        logger.debug(f"{"[DEBUG]:":10} Annotating {basename} -> {os.path.basename(output_sample_dir)}")
-
-        # Determine what needs to be done
-        has_original_annotation = utils.file_exists_and_not_empty(output_sample_gbk_original) and utils.file_exists_and_not_empty(output_sample_gff_original)
-        has_linearised_annotation_and_fasta = utils.file_exists_and_not_empty(output_sample_gbk_linearised) and utils.file_exists_and_not_empty(output_sample_gff_linearised) and utils.file_exists_and_not_empty(output_sample_fasta_linearised)
-        
-        if has_linearised_annotation_and_fasta:
-            logger.debug(f"{"[INFO]:":10} {filename_prefix} already completely processed with linearised sequence")
-        elif has_original_annotation:
-            logger.debug(f"{"[INFO]:":10} {filename_prefix} needs linearisation and re-annotation")
-        else:
-            logger.debug(f"{"[INFO]:":10} {filename_prefix} needs initial annotation")
-
-        # Resolve chloe project and script paths
-        if (chloe_project_dir is None) != (chloe_script_path is None):
-            logger.error(f"{"[ERROR]:":10} Both --chloe_project_dir and --chloe_script must be provided together.")
-            utils.exit_program()
-
-        if chloe_project_dir and chloe_script_path:
-            chloe_project = f'--project={chloe_project_dir}'
-            chloe_script = chloe_script_path
-            logger.info(f"{"[INFO]:":10} Using user-specified chloe project and script")
-        else:
-            try:
-                conda_prefix = os.environ['CONDA_PREFIX']
-                logger.debug(f"{"[DEBUG]:":10} The CONDA_PREFIX is: {conda_prefix}")
-            except KeyError:
-                logger.debug(f"{"[DEBUG]:":10} CONDA_PREFIX environment variable is not set.")
-                conda_prefix = None
-
-            if not conda_prefix:
-                logger.error(f"{"[ERROR]:":10} Cannot locate chloe project/script without CONDA_PREFIX or user-specified paths")
-                utils.exit_program()
-
-            chloe_project = f'--project={conda_prefix}/bin/chloe'
-            chloe_script = f'{conda_prefix}/bin/chloe/chloe.jl'
-
-        # Run chloe annotate command
-        cmd = [
-            'julia',
-            chloe_project,
-            chloe_script,
-            'annotate',
-            '--no-filter',
-            '--no-transform',
-            '--gbk',
-            '--output',
-            output_sample_dir,
-            fasta_file
-        ]
-
-        # Execute annotation workflow
-        if not has_original_annotation:
-            # Do initial annotation
-            logger.debug(f"{"[INFO]:":10} Performing initial annotation for {filename_prefix}")
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                check=True
-            )
-
-            # Rename original annotation files to preserve original annotation
-            if os.path.exists(output_sample_gbk):
-                os.rename(output_sample_gbk, output_sample_gbk_original)
-            if os.path.exists(output_sample_gff):
-                os.rename(output_sample_gff, output_sample_gff_original)
-
-            has_original_annotation = True
-
-        # Check metadata to determine if linearisation should be skipped
-        should_linearise = True
-        if metadata_dict:
-            # Get fasta filename for metadata lookup (same logic as in convert_gbk_to_embl)
-            fasta_filename = basename
-            if fasta_filename in metadata_dict:
-                topology = metadata_dict[fasta_filename].get('linear_or_circular', 'circular')
-                if topology == 'linear':
-                    should_linearise = False
-                    logger.debug(f"{"[INFO]:":10} Skipping linearisation for {filename_prefix} - already marked as linear in metadata")
-
-        # Linearise and re-annotate (if we have original annotation but no linearised and sample should be linearised)
-        if has_original_annotation and not has_linearised_annotation_and_fasta and should_linearise:
-            logger.debug(f"{"[INFO]:":10} Linearising {filename_prefix} upstream of {linearise_gene}...")
+        if is_multi_sequence:
+            worker_logger.debug(f"{"[DEBUG]:":10} Multi-sequence FASTA detected: {basename} ({sequence_count} sequences)")
             
-            # Linearise the genome upstream of the specified gene
-            output_sample_fasta_linearised = linearise_genome_upstream_gene(
-                output_sample_gbk_original, 
-                fasta_file, 
-                output_sample_dir, 
-                filename_prefix_no_dots,
-                linearise_gene
-            )
-
-            if output_sample_fasta_linearised != fasta_file:
-                # Re-annotate with linearised sequence
-
-                # Re-run chloe with linearised fasta
-                cmd[9] = output_sample_fasta_linearised  # Replace the fasta file in the command
-
-                logger.debug(f"{"[DEBUG]:":10} Re-annotating {filename_prefix} with linearised sequence: {cmd}")
+            # Create a subdirectory for this multi-sequence sample
+            output_sample_dir = os.path.join(annotated_genomes_dir, filename_prefix_no_dots)
+            os.makedirs(output_sample_dir, exist_ok=True)
+            
+            # Split the multi-sequence FASTA into individual files
+            individual_sequence_files = split_multi_sequence_fasta(fasta_file, output_sample_dir, filename_prefix, worker_logger)
+            
+            if not individual_sequence_files:
+                worker_logger.error(f"{"[ERROR]:":10} Failed to split multi-sequence FASTA file: {basename}")
+                return False, (f'Failed to split multi-sequence FASTA file: {basename}', traceback.format_exc())
+            
+            # Initialize dict for multi-sequence sample data
+            sample_data = {
+                'original_fasta': basename,
+                'is_multi_sequence': True,
+                'sequence_count': sequence_count,
+                'sequences': {}
+            }
+            
+            # Process each individual sequence
+            for seq_idx, seq_file in enumerate(individual_sequence_files, 1):
+                seq_basename = os.path.basename(seq_file)
+                seq_name = os.path.splitext(seq_basename)[0]
                 
-                result = subprocess.run(
-                    cmd,
-                    capture_output=True,
-                    text=True,
-                    check=True
+                worker_logger.debug(f"{"[DEBUG]:":10} Processing sequence {seq_idx}/{sequence_count}: {seq_name}")
+                
+                # Process this individual sequence
+                seq_result = process_single_sequence(
+                    seq_file, 
+                    output_sample_dir, 
+                    seq_name, 
+                    chloe_project_dir, 
+                    chloe_script_path, 
+                    linearise_gene, 
+                    metadata_dict, 
+                    basename,  # Original multi-sequence filename for metadata lookup
+                    worker_logger
                 )
-   
-                logger.debug(f"{"[DEBUG]:":10} Re-annotation complete for {filename_prefix}")
-
-        # Store the linearised files
-        if should_linearise:
-            annotated_genomes[filename_prefix_no_dots]['gbk'] = output_sample_gbk_linearised
-            annotated_genomes[filename_prefix_no_dots]['gff'] = output_sample_gff_linearised
-            annotated_genomes[filename_prefix_no_dots]['fasta'] = output_sample_fasta_linearised
+                
+                if seq_result:
+                    sample_data['sequences'][seq_name] = seq_result
+            
+            # Store the multi-sequence sample info
+            # For multi-sequence, collect all individual sequence files
+            if sample_data['sequences']:
+                # Store all individual sequence files
+                all_gbk_files = []
+                all_gff_files = []
+                all_fasta_files = []
+                
+                for seq_name, seq_result in sample_data['sequences'].items():
+                    all_gbk_files.append(seq_result['gbk'])
+                    all_gff_files.append(seq_result['gff'])
+                    all_fasta_files.append(seq_result['fasta'])
+                
+                # Store all files in the main dictionary
+                sample_data['gbk'] = all_gbk_files
+                sample_data['gff'] = all_gff_files
+                sample_data['fasta'] = all_fasta_files
+            
+            return True, (filename_prefix_no_dots, sample_data)
+        
         else:
-            annotated_genomes[filename_prefix_no_dots]['gbk'] = output_sample_gbk_original
-            annotated_genomes[filename_prefix_no_dots]['gff'] = output_sample_gff_original
-            annotated_genomes[filename_prefix_no_dots]['fasta'] = fasta_file
-
-    utils.log_separator(logger)
-    time.sleep(0.1)
-
-    return annotated_genomes
+            # Single sequence FASTA - process as before
+            worker_logger.debug(f"{"[DEBUG]:":10} Single sequence FASTA: {basename}")
+            
+            # Initialize dict for single sequence sample data
+            sample_data = {
+                'original_fasta': basename,
+                'is_multi_sequence': False,
+                'sequence_count': 1
+            }
+            
+            # Process single sequence
+            result = process_single_sequence(
+                fasta_file, 
+                os.path.join(annotated_genomes_dir, filename_prefix_no_dots), 
+                filename_prefix, 
+                chloe_project_dir, 
+                chloe_script_path, 
+                linearise_gene, 
+                metadata_dict, 
+                basename,
+                worker_logger
+            )
+            
+            if result:
+                sample_data.update(result)
+            
+            return True, (filename_prefix_no_dots, sample_data)
+            
+    except Exception as e:
+        return False, (e, traceback.format_exc())
 
 
 def convert_gbk_to_embl(annotated_genomes_dict, output_directory, metadata_dict=None):
@@ -2397,15 +2757,29 @@ def convert_gbk_to_embl(annotated_genomes_dict, output_directory, metadata_dict=
             logger.warning(f"{"[WARNING]:":10} Skipping {sample_name} - has error: {genome_info['error']}")
             continue
             
-        gbk_file = genome_info.get('gbk')
-        if not gbk_file or not os.path.exists(gbk_file):
-            logger.warning(f"{"[WARNING]:":10} GenBank file not found for {sample_name}")
-            continue
-
-        fasta_file = genome_info.get('fasta')
-        if not fasta_file or not os.path.exists(fasta_file):
-            logger.warning(f"{"[WARNING]:":10} Fasta file not found for {sample_name}")
-            continue
+        gbk_files = genome_info.get('gbk')
+        fasta_files = genome_info.get('fasta')
+        
+        # Handle both single files and lists of files (for multi-sequence samples)
+        if isinstance(gbk_files, list):
+            # Multi-sequence sample
+            if not gbk_files or not all(os.path.exists(f) for f in gbk_files):
+                logger.warning(f"{"[WARNING]:":10} One or more GenBank files not found for {sample_name}")
+                continue
+            if not fasta_files or not all(os.path.exists(f) for f in fasta_files):
+                logger.warning(f"{"[WARNING]:":10} One or more Fasta files not found for {sample_name}")
+                continue
+        else:
+            # Single sequence sample
+            if not gbk_files or not os.path.exists(gbk_files):
+                logger.warning(f"{"[WARNING]:":10} GenBank file not found for {sample_name}")
+                continue
+            if not fasta_files or not os.path.exists(fasta_files):
+                logger.warning(f"{"[WARNING]:":10} Fasta file not found for {sample_name}")
+                continue
+            # Convert to lists for consistent processing
+            gbk_files = [gbk_files]
+            fasta_files = [fasta_files]
         
         # Get fasta filename for metadata lookup
         fasta_filename = genome_info['original_fasta']
@@ -2427,170 +2801,179 @@ def convert_gbk_to_embl(annotated_genomes_dict, output_directory, metadata_dict=
         genus_species = sample_metadata['genus_species']
         linear_or_circular = sample_metadata['linear_or_circular']
             
-        try:
-            # Read GenBank file using utils.build_adjusted_genbank_io   
-            gbk_io, adjusted_gbk_content = utils.build_adjusted_genbank_io(gbk_file, fasta_file, logger=logger)
-            record = next(SeqIO.parse(gbk_io, 'genbank'))
-            record_seq_length = len(record.seq)
-
-            # Add source feature at the beginning of features list
-            source_location = FeatureLocation(0, len(record.seq))
-            source_feature = SeqFeature(
-                location=source_location,
-                type='source',
-                qualifiers={
-                    'organism': [genus_species],
-                    'mol_type': ['genomic DNA']
-                }
-            )
-            record.features.insert(0, source_feature)
-
-            # Remove all existing locus_tags
-            for feature in record.features:
-                if 'locus_tag' in feature.qualifiers:
-                    del feature.qualifiers['locus_tag']
-            
-            # Initialize locus counter before any special-case tagging
-            locus_counter = 1
-
-            # Special handling for rps12:
-            # - Keep the two rps12 CDS features
-            # - Create a corresponding gene feature for each CDS with identical coordinates
-            # - Remove all other rps12 features (e.g., gene or intron features that don't match the CDS)
+        # Process each file in the lists
+        for file_idx, (gbk_file, fasta_file) in enumerate(zip(gbk_files, fasta_files)):
             try:
-                rps12_cds = []
-                for f in record.features:
-                    if f.type == 'CDS' and 'gene' in f.qualifiers and f.qualifiers['gene'][0] == 'rps12':
-                        rps12_cds.append(f)
+                # For multi-sequence samples, create sequence-specific names
+                if len(gbk_files) > 1:
+                    seq_suffix = f"_seq{file_idx+1:03d}"
+                    embl_sample_name = f"{sample_name}{seq_suffix}"
+                else:
+                    embl_sample_name = sample_name
+                
+                # Read GenBank file using utils.build_adjusted_genbank_io   
+                gbk_io, adjusted_gbk_content = utils.build_adjusted_genbank_io(gbk_file, fasta_file, logger=logger)
+                record = next(SeqIO.parse(gbk_io, 'genbank'))
+                record_seq_length = len(record.seq)
 
-                if rps12_cds:
-                    # Remove all non-CDS rps12 features
-                    new_features = []
-                    for f in record.features:
-                        gene_name = None
-                        if 'gene' in f.qualifiers:
-                            gene_name = f.qualifiers['gene'][0]
-                        elif 'product' in f.qualifiers:
-                            gene_name = f.qualifiers['product'][0]
-                        if gene_name == 'rps12' and f.type != 'CDS':
-                            continue
-                        new_features.append(f)
+                # Add source feature at the beginning of features list
+                source_location = FeatureLocation(0, len(record.seq))
+                source_feature = SeqFeature(
+                    location=source_location,
+                    type='source',
+                    qualifiers={
+                        'organism': [genus_species],
+                        'mol_type': ['genomic DNA']
+                    }
+                )
+                record.features.insert(0, source_feature)
 
-                    # Insert a gene feature immediately before each rps12 CDS
-                    for cds in rps12_cds:
-                        try:
-                            insert_at = new_features.index(cds)
-                        except ValueError:
-                            insert_at = len(new_features)
-                        rps12_gene_feature = SeqFeature(
-                            location=cds.location,
-                            type='gene',
-                            qualifiers={'gene': ['rps12']}
-                        )
-                        # Assign a shared locus_tag for the CDS and its paired gene feature
-                        pair_tag = f"{locus_tag_prefix}_LOCUS{locus_counter}"
-                        locus_counter += 1
-                        rps12_gene_feature.qualifiers['locus_tag'] = [pair_tag]
-                        cds.qualifiers['locus_tag'] = [pair_tag]
-                        new_features.insert(insert_at, rps12_gene_feature)
-
-                    record.features = new_features
-            except Exception:
-                # Fail-safe: proceed without special handling if any unexpected structure is encountered
-                pass
-
-            # Modify features for EMBL output
-            
-            # First pass: identify gene groups and assign locus_tags in order
-            gene_occurrence_map = {}  # gene_name -> occurrence_count
-            gene_group_locus_map = {}  # (gene_name, occurrence) -> locus_tag
-            feature_to_gene_group = {}  # feature_index -> (gene_name, occurrence)
-            
-            for idx, feature in enumerate(record.features):
-                if feature.type in ['gene', 'CDS', 'tRNA', 'rRNA', 'intron']:
-                    # Skip if already has a locus_tag (e.g., from rps12 special handling)
+                # Remove all existing locus_tags
+                for feature in record.features:
                     if 'locus_tag' in feature.qualifiers:
-                        continue
-                        
-                    # Get gene name
-                    gene_name = None
-                    if 'gene' in feature.qualifiers:
-                        gene_name = feature.qualifiers['gene'][0]
-      
-                    if gene_name:
-                        # Determine which occurrence of this gene we're dealing with
-                        if feature.type == 'gene':
-                            # New gene occurrence
-                            gene_occurrence_map[gene_name] = gene_occurrence_map.get(gene_name, 0) + 1
-                            current_occurrence = gene_occurrence_map[gene_name]
-                            
-                            # Assign new locus tag for this gene occurrence
-                            gene_group = (gene_name, current_occurrence)
-                            gene_group_locus_map[gene_group] = f"{locus_tag_prefix}_LOCUS{locus_counter}"
+                        del feature.qualifiers['locus_tag']
+                
+                # Initialize locus counter before any special-case tagging
+                locus_counter = 1
+
+                # Special handling for rps12:
+                # - Keep the two rps12 CDS features
+                # - Create a corresponding gene feature for each CDS with identical coordinates
+                # - Remove all other rps12 features (e.g., gene or intron features that don't match the CDS)
+                try:
+                    rps12_cds = []
+                    for f in record.features:
+                        if f.type == 'CDS' and 'gene' in f.qualifiers and f.qualifiers['gene'][0] == 'rps12':
+                            rps12_cds.append(f)
+
+                    if rps12_cds:
+                        # Remove all non-CDS rps12 features
+                        new_features = []
+                        for f in record.features:
+                            gene_name = None
+                            if 'gene' in f.qualifiers:
+                                gene_name = f.qualifiers['gene'][0]
+                            elif 'product' in f.qualifiers:
+                                gene_name = f.qualifiers['product'][0]
+                            if gene_name == 'rps12' and f.type != 'CDS':
+                                continue
+                            new_features.append(f)
+
+                        # Insert a gene feature immediately before each rps12 CDS
+                        for cds in rps12_cds:
+                            try:
+                                insert_at = new_features.index(cds)
+                            except ValueError:
+                                insert_at = len(new_features)
+                            rps12_gene_feature = SeqFeature(
+                                location=cds.location,
+                                type='gene',
+                                qualifiers={'gene': ['rps12']}
+                            )
+                            # Assign a shared locus_tag for the CDS and its paired gene feature
+                            pair_tag = f"{locus_tag_prefix}_LOCUS{locus_counter}"
                             locus_counter += 1
-                        else:
-                            # Feature belongs to the most recent occurrence of this gene
-                            current_occurrence = gene_occurrence_map.get(gene_name, 1)
-                            gene_group = (gene_name, current_occurrence)
-                            
-                            # Create locus tag if this is the first feature for a gene without a gene feature
-                            if gene_group not in gene_group_locus_map:
-                                gene_occurrence_map[gene_name] = current_occurrence
+                            rps12_gene_feature.qualifiers['locus_tag'] = [pair_tag]
+                            cds.qualifiers['locus_tag'] = [pair_tag]
+                            new_features.insert(insert_at, rps12_gene_feature)
+
+                        record.features = new_features
+                except Exception:
+                    # Fail-safe: proceed without special handling if any unexpected structure is encountered
+                    pass
+
+                # Modify features for EMBL output
+                
+                # First pass: identify gene groups and assign locus_tags in order
+                gene_occurrence_map = {}  # gene_name -> occurrence_count
+                gene_group_locus_map = {}  # (gene_name, occurrence) -> locus_tag
+                feature_to_gene_group = {}  # feature_index -> (gene_name, occurrence)
+                
+                for idx, feature in enumerate(record.features):
+                    if feature.type in ['gene', 'CDS', 'tRNA', 'rRNA', 'intron']:
+                        # Skip if already has a locus_tag (e.g., from rps12 special handling)
+                        if 'locus_tag' in feature.qualifiers:
+                            continue
+
+                        # Get gene name
+                        gene_name = None
+                        if 'gene' in feature.qualifiers:
+                            gene_name = feature.qualifiers['gene'][0]
+      
+                        if gene_name:
+                            # Determine which occurrence of this gene we're dealing with
+                            if feature.type == 'gene':
+                                # New gene occurrence
+                                gene_occurrence_map[gene_name] = gene_occurrence_map.get(gene_name, 0) + 1
+                                current_occurrence = gene_occurrence_map[gene_name]
+                                
+                                # Assign new locus tag for this gene occurrence
+                                gene_group = (gene_name, current_occurrence)
                                 gene_group_locus_map[gene_group] = f"{locus_tag_prefix}_LOCUS{locus_counter}"
                                 locus_counter += 1
+                            else:
+                                # Feature belongs to the most recent occurrence of this gene
+                                current_occurrence = gene_occurrence_map.get(gene_name, 1)
+                                gene_group = (gene_name, current_occurrence)
+                                
+                                # Create locus tag if this is the first feature for a gene without a gene feature
+                                if gene_group not in gene_group_locus_map:
+                                    gene_occurrence_map[gene_name] = current_occurrence
+                                    gene_group_locus_map[gene_group] = f"{locus_tag_prefix}_LOCUS{locus_counter}"
+                                    locus_counter += 1
+                            
+                            feature_to_gene_group[idx] = gene_group
                         
-                        feature_to_gene_group[idx] = gene_group
-                        
-                elif feature.type == 'repeat_region':
-                    feature.qualifiers['locus_tag'] = [f"{locus_tag_prefix}_LOCUS{locus_counter}"]
-                    locus_counter += 1
+                    elif feature.type == 'repeat_region':
+                        feature.qualifiers['locus_tag'] = [f"{locus_tag_prefix}_LOCUS{locus_counter}"]
+                        locus_counter += 1
 
-            # Second pass: apply locus tags and other modifications
-            for idx, feature in enumerate(record.features):
-                # Remove /ID= and /parent= and /name qualifiers if present (not used in EMBL format)
-                if 'ID' in feature.qualifiers:
-                    del feature.qualifiers['ID']
-                if 'parent' in feature.qualifiers:
-                    del feature.qualifiers['parent']
-                if 'name' in feature.qualifiers:
-                    del feature.qualifiers['name']
-                
-                if feature.type in ['gene', 'CDS', 'tRNA', 'rRNA', 'intron']:
-                    # Skip if already has a locus_tag (e.g., from rps12 special handling)
-                    if 'locus_tag' not in feature.qualifiers:
-                        if idx in feature_to_gene_group:
-                            gene_group = feature_to_gene_group[idx]
-                            if gene_group in gene_group_locus_map:
-                                feature.qualifiers['locus_tag'] = [gene_group_locus_map[gene_group]]
-                
-                # Additional modifications for CDS features
-                if feature.type == 'CDS':
-                    # Add /transl_table=11 to all CDS features
-                    feature.qualifiers['transl_table'] = ['11']
-
-                    # Add /codon_start=1 to all CDS features
-                    feature.qualifiers['codon_start'] = ['1']
+                # Second pass: apply locus tags and other modifications
+                for idx, feature in enumerate(record.features):
+                    # Remove /ID= and /parent= and /name qualifiers if present (not used in EMBL format)
+                    if 'ID' in feature.qualifiers:
+                        del feature.qualifiers['ID']
+                    if 'parent' in feature.qualifiers:
+                        del feature.qualifiers['parent']
+                    if 'name' in feature.qualifiers:
+                        del feature.qualifiers['name']
                     
-                    # Add /trans_splicing to rps12 genes
-                    if 'gene' in feature.qualifiers and feature.qualifiers['gene'][0] == 'rps12':
-                        feature.qualifiers['trans_splicing'] = ['']
-            
-            # Convert to EMBL format
-            embl_filename = f"{sample_name}.embl"
-            embl_filepath = os.path.join(embl_output_dir, embl_filename)
-            
-            # Write EMBL file first pass
-            with open(embl_filepath, 'w') as handle:
-                SeqIO.write(record, handle, 'embl')
+                    if feature.type in ['gene', 'CDS', 'tRNA', 'rRNA', 'intron']:
+                        # Skip if already has a locus_tag (e.g., from rps12 special handling)
+                        if 'locus_tag' not in feature.qualifiers:
+                            if idx in feature_to_gene_group:
+                                gene_group = feature_to_gene_group[idx]
+                                if gene_group in gene_group_locus_map:
+                                    feature.qualifiers['locus_tag'] = [gene_group_locus_map[gene_group]]
+                    
+                    # Additional modifications for CDS features
+                    if feature.type == 'CDS':
+                        # Add /transl_table=11 to all CDS features
+                        feature.qualifiers['transl_table'] = ['11']
 
-            # Convert EMBL file to ENA template format
-            convert_embl_to_ena_template(embl_filepath, sample_metadata, record_seq_length, record.id)
-            
-            logger.debug(f"{"[DEBUG]:":10} Converted {sample_name} to EMBL format: {embl_filepath}")
-            
-        except Exception as e:
-            logger.error(f"{"[ERROR]:":10} Failed to convert {sample_name} to EMBL format: {str(e)}\n{traceback.format_exc()}")
-            continue
+                        # Add /codon_start=1 to all CDS features
+                        feature.qualifiers['codon_start'] = ['1']
+                        
+                        # Add /trans_splicing to rps12 genes
+                        if 'gene' in feature.qualifiers and feature.qualifiers['gene'][0] == 'rps12':
+                            feature.qualifiers['trans_splicing'] = ['']
+                
+                # Convert to EMBL format
+                embl_filename = f"{embl_sample_name}.embl"
+                embl_filepath = os.path.join(embl_output_dir, embl_filename)
+                
+                # Write EMBL file first pass
+                with open(embl_filepath, 'w') as handle:
+                    SeqIO.write(record, handle, 'embl')
+
+                # Convert EMBL file to ENA template format
+                convert_embl_to_ena_template(embl_filepath, sample_metadata, record_seq_length, record.id)
+                
+                logger.debug(f"{"[DEBUG]:":10} Converted {embl_sample_name} to EMBL format: {embl_filepath}")
+                
+            except Exception as e:
+                logger.error(f"{"[ERROR]:":10} Failed to convert {embl_sample_name if 'embl_sample_name' in locals() else sample_name} to EMBL format: {str(e)}\n{traceback.format_exc()}")
+                continue
     
     logger.info(f"{"[INFO]:":10} EMBL conversion complete. Files written to: {embl_output_dir}")
     
@@ -2772,18 +3155,59 @@ def query_intergenic_regions(annotated_genomes_dict, output_directory, min_inter
             except Exception as e:
                 logger.warning(f"{"[WARNING]:":10} Failed to load existing results for {sample_name}: {str(e)}")
             continue
+        
+        # Handle both single and multi-sequence samples
+        is_multi_sequence = genome_info.get('is_multi_sequence', False)
+        
+        if is_multi_sequence:
+            # Multi-sequence sample - get lists of files
+            gbk_files = genome_info.get('gbk', [])
+            fasta_files = genome_info.get('fasta', [])
             
-        sample_data = {
-            'sample_name': sample_name,
-            'genome_info': genome_info,
-            'blast_db_path': blast_db_path,
-            'min_intergenic_length': min_intergenic_length,
-            'blast_evalue': blast_evalue,
-            'debug_intergenic': debug_intergenic,
-            'max_blast_hits': max_blast_hits,
-            'threads': threads,
-            'intergenic_output_dir': intergenic_output_dir
-        }
+            if not gbk_files or not fasta_files:
+                logger.warning(f"{"[WARNING]:":10} Skipping {sample_name} - missing GenBank or FASTA files")
+                continue
+                
+            # Create sample data for multi-sequence processing
+            sample_data = {
+                'sample_name': sample_name,
+                'genome_info': genome_info,
+                'gbk_files': gbk_files,
+                'fasta_files': fasta_files,
+                'is_multi_sequence': True,
+                'blast_db_path': blast_db_path,
+                'min_intergenic_length': min_intergenic_length,
+                'blast_evalue': blast_evalue,
+                'debug_intergenic': debug_intergenic,
+                'max_blast_hits': max_blast_hits,
+                'threads': threads,
+                'intergenic_output_dir': intergenic_output_dir
+            }
+        else:
+            # Single sequence sample - get single file paths
+            gbk_file = genome_info.get('gbk')
+            fasta_file = genome_info.get('fasta')
+            
+            if not gbk_file or not fasta_file:
+                logger.warning(f"{"[WARNING]:":10} Skipping {sample_name} - missing GenBank or FASTA files")
+                continue
+                
+            # Create sample data for single sequence processing
+            sample_data = {
+                'sample_name': sample_name,
+                'genome_info': genome_info,
+                'gbk_files': [gbk_file],
+                'fasta_files': [fasta_file],
+                'is_multi_sequence': False,
+                'blast_db_path': blast_db_path,
+                'min_intergenic_length': min_intergenic_length,
+                'blast_evalue': blast_evalue,
+                'debug_intergenic': debug_intergenic,
+                'max_blast_hits': max_blast_hits,
+                'threads': threads,
+                'intergenic_output_dir': intergenic_output_dir
+            }
+        
         sample_data_list.append(sample_data)
     
     if not sample_data_list:
@@ -2792,7 +3216,7 @@ def query_intergenic_regions(annotated_genomes_dict, output_directory, min_inter
             # Write combined report with existing results only
             if existing_results:
                 combined_report_file = os.path.join(intergenic_output_dir, "combined_intergenic_blast_results.tsv")
-                write_blast_report(existing_results, combined_report_file, "ALL_GENOMES")
+                write_blast_report(existing_results, combined_report_file, "ALL_GENOMES", logger)
                 logger.info(f"{"[INFO]:":10} Combined report written to: {combined_report_file}")
             return
         else:
@@ -2837,7 +3261,7 @@ def query_intergenic_regions(annotated_genomes_dict, output_directory, min_inter
     # Write combined report
     if all_results:
         combined_report_file = os.path.join(intergenic_output_dir, "combined_intergenic_blast_results.tsv")
-        write_blast_report(all_results, combined_report_file, "ALL_GENOMES")
+        write_blast_report(all_results, combined_report_file, "ALL_GENOMES", logger)
         logger.info(f"{"[INFO]:":10} Combined report written to: {combined_report_file}")
     else:
         logger.warning(f"{"[WARNING]:":10} No BLAST results found for any genome")
@@ -2860,32 +3284,54 @@ def extract_intergenic_regions(gbk_file, fasta_file, min_length=50, debug_interg
     """
     intergenic_regions = []
     
-    try:
-        # Parse GenBank file
-        gbk_io, adjusted_gbk_content = utils.build_adjusted_genbank_io(
-            gbk_file_path=gbk_file,
-            fasta_file_path=fasta_file,
-            logger=logger,
-        )
+    # Parse GenBank file
+    gbk_io, adjusted_gbk_content = utils.build_adjusted_genbank_io(
+        gbk_file_path=gbk_file,
+        fasta_file_path=fasta_file,
+        logger=logger,
+    )
 
-        record = SeqIO.read(gbk_io, "genbank")
-        
-        # Get features with locations, but exclude features that are parts of genes or structural regions
-        # We want intergenic regions between genes and within genes (introns)
-        excluded_types = ['exon', 'source', 'LSC', 'SSC', 'inverted_repeat', 'intron', 'repeat_region']
-        kept_features = [f for f in record.features if hasattr(f, 'location') and f.location is not None and f.type not in excluded_types]
-        feature_types = set([f.type for f in kept_features])
+    record = SeqIO.read(gbk_io, "genbank")
+    
+    # Get features with locations, but exclude features that are parts of genes or structural regions
+    # We want intergenic regions between genes and within genes (introns)
+    excluded_types = ['exon', 'source', 'LSC', 'SSC', 'inverted_repeat', 'intron', 'repeat_region']
+    kept_features = [f for f in record.features if hasattr(f, 'location') and f.location is not None and f.type not in excluded_types]
+    feature_types = set([f.type for f in kept_features])
 
-        # Simple approach: Get coordinates for CDS regions (or tRNA coordinates for tRNAs)
-        # Group features by gene name and get the appropriate coordinates
-        gene_coordinates = []
+    # Simple approach: Get coordinates for CDS regions (or tRNA coordinates for tRNAs)
+    # Group features by gene name and get the appropriate coordinates
+    gene_coordinates = []
+    
+    # Process each feature individually to handle multiple copies of the same gene
+    for feature in kept_features:
+        gene_name = get_gene_name(feature)
         
-        # Process each feature individually to handle multiple copies of the same gene
-        for feature in kept_features:
-            gene_name = get_gene_name(feature)
-            
-            # Handle CDS features
-            if feature.type == 'CDS':
+        # Handle CDS features
+        if feature.type == 'CDS':
+            if hasattr(feature.location, 'parts') and len(feature.location.parts) > 1:
+                # Split gene - add each part
+                for part in feature.location.parts:
+                    gene_coordinates.append({
+                        'gene_name': gene_name,
+                        'start': part.start,
+                        'end': part.end,
+                        'type': 'CDS'
+                    })
+            else:
+                # Single location
+                gene_coordinates.append({
+                    'gene_name': gene_name,
+                    'start': feature.location.start,
+                    'end': feature.location.end,
+                    'type': 'CDS'
+                })
+        
+        # Handle tRNA features (only if no CDS for this gene)
+        elif feature.type == 'tRNA':
+            # Check if we already have CDS coordinates for this gene
+            existing_cds = [coord for coord in gene_coordinates if coord['gene_name'] == gene_name and coord['type'] == 'CDS']
+            if not existing_cds:
                 if hasattr(feature.location, 'parts') and len(feature.location.parts) > 1:
                     # Split gene - add each part
                     for part in feature.location.parts:
@@ -2893,7 +3339,7 @@ def extract_intergenic_regions(gbk_file, fasta_file, min_length=50, debug_interg
                             'gene_name': gene_name,
                             'start': part.start,
                             'end': part.end,
-                            'type': 'CDS'
+                            'type': 'tRNA'
                         })
                 else:
                     # Single location
@@ -2901,164 +3347,136 @@ def extract_intergenic_regions(gbk_file, fasta_file, min_length=50, debug_interg
                         'gene_name': gene_name,
                         'start': feature.location.start,
                         'end': feature.location.end,
-                        'type': 'CDS'
+                        'type': 'tRNA'
                     })
-            
-            # Handle tRNA features (only if no CDS for this gene)
-            elif feature.type == 'tRNA':
-                # Check if we already have CDS coordinates for this gene
-                existing_cds = [coord for coord in gene_coordinates if coord['gene_name'] == gene_name and coord['type'] == 'CDS']
-                if not existing_cds:
-                    if hasattr(feature.location, 'parts') and len(feature.location.parts) > 1:
-                        # Split gene - add each part
-                        for part in feature.location.parts:
-                            gene_coordinates.append({
-                                'gene_name': gene_name,
-                                'start': part.start,
-                                'end': part.end,
-                                'type': 'tRNA'
-                            })
-                    else:
-                        # Single location
+        
+        # Handle rRNA features (only if no CDS or tRNA for this gene)
+        elif feature.type == 'rRNA':
+            # Check if we already have CDS or tRNA coordinates for this gene
+            existing_coords = [coord for coord in gene_coordinates if coord['gene_name'] == gene_name and coord['type'] in ['CDS', 'tRNA']]
+            if not existing_coords:
+                if hasattr(feature.location, 'parts') and len(feature.location.parts) > 1:
+                    # Split gene - add each part
+                    for part in feature.location.parts:
                         gene_coordinates.append({
                             'gene_name': gene_name,
-                            'start': feature.location.start,
-                            'end': feature.location.end,
-                            'type': 'tRNA'
-                        })
-            
-            # Handle rRNA features (only if no CDS or tRNA for this gene)
-            elif feature.type == 'rRNA':
-                # Check if we already have CDS or tRNA coordinates for this gene
-                existing_coords = [coord for coord in gene_coordinates if coord['gene_name'] == gene_name and coord['type'] in ['CDS', 'tRNA']]
-                if not existing_coords:
-                    if hasattr(feature.location, 'parts') and len(feature.location.parts) > 1:
-                        # Split gene - add each part
-                        for part in feature.location.parts:
-                            gene_coordinates.append({
-                                'gene_name': gene_name,
-                                'start': part.start,
-                                'end': part.end,
-                                'type': 'rRNA'
-                            })
-                    else:
-                        # Single location
-                        gene_coordinates.append({
-                            'gene_name': gene_name,
-                            'start': feature.location.start,
-                            'end': feature.location.end,
+                            'start': part.start,
+                            'end': part.end,
                             'type': 'rRNA'
                         })
-            
-            # Handle other gene types (misc_RNA, ncRNA, etc.) as fallback
-            elif feature.type in ['misc_RNA', 'ncRNA']:
-                # Check if we already have coordinates for this gene
-                existing_coords = [coord for coord in gene_coordinates if coord['gene_name'] == gene_name]
-                if not existing_coords:
-                    if hasattr(feature.location, 'parts') and len(feature.location.parts) > 1:
-                        # Split gene - add each part
-                        for part in feature.location.parts:
-                            gene_coordinates.append({
-                                'gene_name': gene_name,
-                                'start': part.start,
-                                'end': part.end,
-                                'type': feature.type
-                            })
-                    else:
-                        # Single location
+                else:
+                    # Single location
+                    gene_coordinates.append({
+                        'gene_name': gene_name,
+                        'start': feature.location.start,
+                        'end': feature.location.end,
+                        'type': 'rRNA'
+                    })
+        
+        # Handle other gene types (misc_RNA, ncRNA, etc.) as fallback
+        elif feature.type in ['misc_RNA', 'ncRNA']:
+            # Check if we already have coordinates for this gene
+            existing_coords = [coord for coord in gene_coordinates if coord['gene_name'] == gene_name]
+            if not existing_coords:
+                if hasattr(feature.location, 'parts') and len(feature.location.parts) > 1:
+                    # Split gene - add each part
+                    for part in feature.location.parts:
                         gene_coordinates.append({
                             'gene_name': gene_name,
-                            'start': feature.location.start,
-                            'end': feature.location.end,
+                            'start': part.start,
+                            'end': part.end,
                             'type': feature.type
                         })
+                else:
+                    # Single location
+                    gene_coordinates.append({
+                        'gene_name': gene_name,
+                        'start': feature.location.start,
+                        'end': feature.location.end,
+                        'type': feature.type
+                    })
 
-        # Sort coordinates by start position
-        gene_coordinates.sort(key=lambda x: x['start'])
-        
-        if logger:
-            logger.debug(f"{"[DEBUG]:":10} Found {len(gene_coordinates)} gene coordinates for intergenic calculation")
-        
-        # Find intergenic regions between gene coordinates
-        for i in range(len(gene_coordinates) - 1):
-            current_coord = gene_coordinates[i]
-            next_coord = gene_coordinates[i + 1]
-            
-            # Get end of current gene and start of next gene
-            current_end = current_coord['end']
-            next_start = next_coord['start']
-            
-            # Check if there's a gap between genes
-            if next_start > current_end:
-                intergenic_length = next_start - current_end
-                
-                if intergenic_length >= min_length:
-                    # Extract intergenic sequence
-                    intergenic_seq = str(record.seq[current_end:next_start])
-                    
-                    # Create intergenic region info
-                    intergenic_info = {
-                        'start': current_end,
-                        'end': next_start,
-                        'length': intergenic_length,
-                        'sequence': intergenic_seq,
-                        'upstream_gene': current_coord['gene_name'],
-                        'downstream_gene': next_coord['gene_name'],
-                        'region_id': f"IG_{current_end}_{next_start}"
-                    }
-                    
-                    intergenic_regions.append(intergenic_info)
-        
-        # Check for intergenic region at the beginning (before first gene)
-        if gene_coordinates:
-            first_coord = gene_coordinates[0]
-            if first_coord['start'] > 0:
-                intergenic_length = first_coord['start']
-                if intergenic_length >= min_length:
-                    intergenic_seq = str(record.seq[0:first_coord['start']])
-                    intergenic_info = {
-                        'start': 0,
-                        'end': first_coord['start'],
-                        'length': intergenic_length,
-                        'sequence': intergenic_seq,
-                        'upstream_gene': 'START',
-                        'downstream_gene': first_coord['gene_name'],
-                        'region_id': f"IG_0_{first_coord['start']}"
-                    }
-                    intergenic_regions.append(intergenic_info)
-        
-        # Check for intergenic region at the end (after last gene)
-        if gene_coordinates:
-            last_coord = gene_coordinates[-1]
-            if last_coord['end'] < len(record.seq):
-                intergenic_length = len(record.seq) - last_coord['end']
-                if intergenic_length >= min_length:
-                    intergenic_seq = str(record.seq[last_coord['end']:])
-                    intergenic_info = {
-                        'start': last_coord['end'],
-                        'end': len(record.seq),
-                        'length': intergenic_length,
-                        'sequence': intergenic_seq,
-                        'upstream_gene': last_coord['gene_name'],
-                        'downstream_gene': 'END',
-                        'region_id': f"IG_{last_coord['end']}_{len(record.seq)}"
-                    }
-                    intergenic_regions.append(intergenic_info)
-        
-        # Write debug FASTA file if requested (for end regions)
-        if debug_intergenic and intergenic_regions:
-            debug_fasta_file = gbk_file.replace('.gbk', '_intergenic_debug.fasta')
-            with open(debug_fasta_file, 'w') as f:
-                for region in intergenic_regions:
-                    f.write(f">{region['region_id']}\n{region['sequence']}\n")
-            if logger:
-                logger.debug(f"{"[DEBUG]:":10} Wrote {len(intergenic_regions)} intergenic regions to debug FASTA: {debug_fasta_file}")
-                    
-    except Exception as e:
-        if logger:
-            logger.error(f"{"[ERROR]:":10} Error extracting intergenic regions from {gbk_file}: {str(e)}")
-            logger.error(traceback.format_exc())
+    # Sort coordinates by start position
+    gene_coordinates.sort(key=lambda x: x['start'])
     
+    if logger:
+        logger.debug(f"{"[DEBUG]:":10} Found {len(gene_coordinates)} gene coordinates for intergenic calculation")
+    
+    # Find intergenic regions between gene coordinates
+    for i in range(len(gene_coordinates) - 1):
+        current_coord = gene_coordinates[i]
+        next_coord = gene_coordinates[i + 1]
+        
+        # Get end of current gene and start of next gene
+        current_end = current_coord['end']
+        next_start = next_coord['start']
+        
+        # Check if there's a gap between genes
+        if next_start > current_end:
+            intergenic_length = next_start - current_end
+            
+            if intergenic_length >= min_length:
+                # Extract intergenic sequence
+                intergenic_seq = str(record.seq[current_end:next_start])
+                
+                # Create intergenic region info
+                intergenic_info = {
+                    'start': current_end,
+                    'end': next_start,
+                    'length': intergenic_length,
+                    'sequence': intergenic_seq,
+                    'upstream_gene': current_coord['gene_name'],
+                    'downstream_gene': next_coord['gene_name'],
+                    'region_id': f"IG_{current_end}_{next_start}"
+                }
+                
+                intergenic_regions.append(intergenic_info)
+    
+    # Check for intergenic region at the beginning (before first gene)
+    if gene_coordinates:
+        first_coord = gene_coordinates[0]
+        if first_coord['start'] > 0:
+            intergenic_length = first_coord['start']
+            if intergenic_length >= min_length:
+                intergenic_seq = str(record.seq[0:first_coord['start']])
+                intergenic_info = {
+                    'start': 0,
+                    'end': first_coord['start'],
+                    'length': intergenic_length,
+                    'sequence': intergenic_seq,
+                    'upstream_gene': 'START',
+                    'downstream_gene': first_coord['gene_name'],
+                    'region_id': f"IG_0_{first_coord['start']}"
+                }
+                intergenic_regions.append(intergenic_info)
+    
+    # Check for intergenic region at the end (after last gene)
+    if gene_coordinates:
+        last_coord = gene_coordinates[-1]
+        if last_coord['end'] < len(record.seq):
+            intergenic_length = len(record.seq) - last_coord['end']
+            if intergenic_length >= min_length:
+                intergenic_seq = str(record.seq[last_coord['end']:])
+                intergenic_info = {
+                    'start': last_coord['end'],
+                    'end': len(record.seq),
+                    'length': intergenic_length,
+                    'sequence': intergenic_seq,
+                    'upstream_gene': last_coord['gene_name'],
+                    'downstream_gene': 'END',
+                    'region_id': f"IG_{last_coord['end']}_{len(record.seq)}"
+                }
+                intergenic_regions.append(intergenic_info)
+    
+    # Write debug FASTA file if requested (for end regions)
+    if debug_intergenic and intergenic_regions:
+        debug_fasta_file = gbk_file.replace('.gbk', '_intergenic_debug.fasta')
+        with open(debug_fasta_file, 'w') as f:
+            for region in intergenic_regions:
+                f.write(f">{region['region_id']}\n{region['sequence']}\n")
+        if logger:
+            logger.debug(f"{"[DEBUG]:":10} Wrote {len(intergenic_regions)} intergenic regions to debug FASTA: {debug_fasta_file}")
+                    
     return intergenic_regions
 
 
@@ -3076,7 +3494,9 @@ def process_single_genome_intergenic(sample_data, log_queue=None):
         worker_logger = utils.setup_worker_logger(__name__, log_queue)
         
         sample_name = sample_data['sample_name']
-        genome_info = sample_data['genome_info']
+        gbk_files = sample_data['gbk_files']
+        fasta_files = sample_data['fasta_files']
+        is_multi_sequence = sample_data['is_multi_sequence']
         blast_db_path = sample_data['blast_db_path']
         min_intergenic_length = sample_data['min_intergenic_length']
         blast_evalue = sample_data['blast_evalue']
@@ -3085,30 +3505,58 @@ def process_single_genome_intergenic(sample_data, log_queue=None):
         threads = sample_data['threads']
         intergenic_output_dir = sample_data['intergenic_output_dir']
         
-        # Get GenBank file path
-        gbk_file = genome_info.get('gbk')
-        if not gbk_file or not os.path.exists(gbk_file):
-            return False, f"GenBank file not found for {sample_name}"
-
-        # Get FASTA file path
-        fasta_file = genome_info.get('fasta')
-        if not fasta_file or not os.path.exists(fasta_file):
-            return False, f"FASTA file not found for {sample_name}"
-
-        # Extract intergenic regions
-        intergenic_regions = extract_intergenic_regions(gbk_file, fasta_file, min_intergenic_length, debug_intergenic, worker_logger)
+        # Validate files exist
+        for gbk_file in gbk_files:
+            if not os.path.exists(gbk_file):
+                return False, f"GenBank file not found: {gbk_file}"
         
-        if not intergenic_regions:
+        for fasta_file in fasta_files:
+            if not os.path.exists(fasta_file):
+                return False, f"FASTA file not found: {fasta_file}"
+
+        # Process all sequences for this sample
+        all_blast_results = []
+        
+        for i, (gbk_file, fasta_file) in enumerate(zip(gbk_files, fasta_files)):
+            # Extract sequence name for multi-sequence samples
+            if is_multi_sequence:
+                seq_basename = os.path.basename(gbk_file)
+                # Remove file extensions
+                seq_name = seq_basename.replace('.chloe.gbk', '').replace('.round1.chloe.gbk', '').replace('.round2.chloe.gbk', '')
+                # Extract just the sequence part using the known file naming pattern
+                # The filename format from split_multi_sequence_fasta is: sample1_seq001_sequence1.chloe.gbk
+                # We want to extract: seq001_sequence1
+                # Use regex to match the pattern: sample_name + "_seq" + 3 digits + "_" + sequence_name
+                pattern = rf"^{re.escape(sample_name)}_seq\d{{3}}_(.+)$"
+                match = re.match(pattern, seq_name)
+                if match:
+                    # Extract the sequence part (everything after sample_name_seq001_)
+                    seq_name = match.group(1)
+                sequence_id = f"{sample_name}_{seq_name}"
+            else:
+                sequence_id = sample_name
+            
+            worker_logger.debug(f"{"[DEBUG]:":10} Processing sequence {i+1}/{len(gbk_files)}: {sequence_id}")
+
+            # Extract intergenic regions
+            intergenic_regions = extract_intergenic_regions(gbk_file, fasta_file, min_intergenic_length, debug_intergenic, worker_logger)
+            
+            if not intergenic_regions:
+                worker_logger.warning(f"{"[WARNING]:":10} No intergenic regions found for {sequence_id}")
+                continue
+
+            # BLAST intergenic regions - use sequence_id to include sequence information
+            blast_results = blast_intergenic_regions(intergenic_regions, blast_db_path, blast_evalue, sequence_id, max_blast_hits, threads, worker_logger)
+            all_blast_results.extend(blast_results)
+        
+        if not all_blast_results:
             return False, (ValueError(f"No intergenic regions found for {sample_name}"), traceback.format_exc())
 
-        # BLAST intergenic regions
-        blast_results = blast_intergenic_regions(intergenic_regions, blast_db_path, blast_evalue, sample_name, max_blast_hits, threads, worker_logger)
-        
-        # Write individual genome report
+        # Write individual genome report (single report per sample)
         genome_report_file = os.path.join(intergenic_output_dir, f"{sample_name}_intergenic_blast_results.tsv")
-        write_blast_report(blast_results, genome_report_file, sample_name, worker_logger)
+        write_blast_report(all_blast_results, genome_report_file, sample_name, worker_logger)
         
-        return True, (blast_results, genome_report_file)
+        return True, (all_blast_results, genome_report_file)
         
     except Exception as e:
         return False, (e, traceback.format_exc())
@@ -3150,78 +3598,70 @@ def blast_intergenic_regions(intergenic_regions, blast_db_path, evalue_threshold
     blast_results = []
     
     for region in intergenic_regions:
-        try:
-            # Create temporary FASTA file for the intergenic region
-            with tempfile.NamedTemporaryFile(mode='w', suffix='.fasta', delete=False) as temp_fasta:
-                temp_fasta.write(f">{region['region_id']}\n{region['sequence']}\n")
-                temp_fasta_path = temp_fasta.name
+        
+        # Create temporary FASTA file for the intergenic region
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.fasta', delete=False) as temp_fasta:
+            temp_fasta.write(f">{region['region_id']}\n{region['sequence']}\n")
+            temp_fasta_path = temp_fasta.name
+        
+        # Create temporary output file for BLAST results
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as temp_output:
+            temp_output_path = temp_output.name
+        
+        # Run BLAST
+        blast_cmd = [
+            'blastn',
+            '-db', blast_db_path,
+            '-query', temp_fasta_path,
+            '-out', temp_output_path,
+            '-evalue', str(evalue_threshold),
+            '-outfmt', '6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore stitle',
+            '-max_target_seqs', str(max_blast_hits),
+            '-num_threads', str(threads)
+        ]
+        
+        result = subprocess.run(blast_cmd, capture_output=True, text=True, check=True)
+        
+        # Parse BLAST results
+        with open(temp_output_path, 'r') as f:
+            for line in f:
+                if line.strip():
+                    fields = line.strip().split('\t')
+                    if len(fields) >= 12:
+                        sseqid = fields[1]
+                        hit_origin = '_'.join(sseqid.split('[')[0].split('_')[:-1])
+                        hit_origin = '_'.join(hit_origin.split('_')[:-1])
+                        hit_gene = sseqid.split('[')[-1].rstrip(']')
+                        hit_gene = '_'.join(hit_gene.split('_')[1:])
+                                            
+                        blast_result = {
+                            'sample_name': sample_name,
+                            'intergenic_region_id': fields[0],
+                            'hit_origin': hit_origin,
+                            'hit_gene': hit_gene,
+                            'percent_identity': float(fields[2]),
+                            'alignment_length': int(fields[3]),
+                            'mismatches': int(fields[4]),
+                            'gap_opens': int(fields[5]),
+                            'query_start': int(fields[6]),
+                            'query_end': int(fields[7]),
+                            'subject_start': int(fields[8]),
+                            'subject_end': int(fields[9]),
+                            'evalue': float(fields[10]),
+                            'bitscore': float(fields[11]),
+                            'hit_title': fields[12] if len(fields) > 12 else '',
+                            'intergenic_start': region['start'],
+                            'intergenic_end': region['end'],
+                            'intergenic_length': region['length'],
+                            'upstream_gene': region['upstream_gene'],
+                            'downstream_gene': region['downstream_gene']
+                        }
+                        blast_results.append(blast_result)
+        
+        # Clean up temporary files
+        os.unlink(temp_fasta_path)
+        os.unlink(temp_output_path)
             
-            # Create temporary output file for BLAST results
-            with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as temp_output:
-                temp_output_path = temp_output.name
-            
-            # Run BLAST
-            blast_cmd = [
-                'blastn',
-                '-db', blast_db_path,
-                '-query', temp_fasta_path,
-                '-out', temp_output_path,
-                '-evalue', str(evalue_threshold),
-                '-outfmt', '6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore stitle',
-                '-max_target_seqs', str(max_blast_hits),
-                '-num_threads', str(threads)
-            ]
-            
-            result = subprocess.run(blast_cmd, capture_output=True, text=True, check=True)
-            
-            # Parse BLAST results
-            with open(temp_output_path, 'r') as f:
-                for line in f:
-                    if line.strip():
-                        fields = line.strip().split('\t')
-                        if len(fields) >= 12:
-                            sseqid = fields[1]
-                            hit_origin = '_'.join(sseqid.split('[')[0].split('_')[:-1])
-                            hit_origin = '_'.join(hit_origin.split('_')[:-1])
-                            hit_gene = sseqid.split('[')[-1].rstrip(']')
-                            hit_gene = '_'.join(hit_gene.split('_')[1:])
-                                                
-                            blast_result = {
-                                'sample_name': sample_name,
-                                'intergenic_region_id': fields[0],
-                                'hit_origin': hit_origin,
-                                'hit_gene': hit_gene,
-                                'percent_identity': float(fields[2]),
-                                'alignment_length': int(fields[3]),
-                                'mismatches': int(fields[4]),
-                                'gap_opens': int(fields[5]),
-                                'query_start': int(fields[6]),
-                                'query_end': int(fields[7]),
-                                'subject_start': int(fields[8]),
-                                'subject_end': int(fields[9]),
-                                'evalue': float(fields[10]),
-                                'bitscore': float(fields[11]),
-                                'hit_title': fields[12] if len(fields) > 12 else '',
-                                'intergenic_start': region['start'],
-                                'intergenic_end': region['end'],
-                                'intergenic_length': region['length'],
-                                'upstream_gene': region['upstream_gene'],
-                                'downstream_gene': region['downstream_gene']
-                            }
-                            blast_results.append(blast_result)
-            
-            # Clean up temporary files
-            os.unlink(temp_fasta_path)
-            os.unlink(temp_output_path)
-            
-        except subprocess.CalledProcessError as e:
-            if logger:
-                logger.error(f"{"[ERROR]:":10} BLAST failed for region {region['region_id']}: {str(e)}")
-                logger.error(f"{"[ERROR]:":10} BLAST stderr: {e.stderr}")
-        except Exception as e:
-            if logger:
-                logger.error(f"{"[ERROR]:":10} Error processing region {region['region_id']}: {str(e)}")
-    
     return blast_results
 
 
@@ -3279,7 +3719,7 @@ def load_existing_blast_results(report_file, sample_name):
     return blast_results
 
 
-def write_blast_report(blast_results, output_file, sample_name, logger=None):
+def write_blast_report(blast_results, output_file, sample_name, logger):
     """
     Write BLAST results to TSV file.
     
@@ -3289,40 +3729,33 @@ def write_blast_report(blast_results, output_file, sample_name, logger=None):
         sample_name (str): Name of the sample or "ALL_GENOMES" for combined report
     """
     if not blast_results:
-        if logger:
-            logger.warning(f"{"[WARNING]:":10} No BLAST results to write for {sample_name}")
-        return
+        logger.warning(f"{"[WARNING]:":10} No BLAST results to write for {sample_name}")
+        raise Exception("No BLAST results to write")
     
-    try:
-        # Define column headers
-        headers = [
-            'sample_name', 'intergenic_region_id', 'hit_origin', 'hit_gene', 'percent_identity',
-            'alignment_length', 'mismatches', 'gap_opens', 'query_start', 'query_end',
-            'subject_start', 'subject_end', 'evalue', 'bitscore', 'hit_title',
-            'intergenic_start', 'intergenic_end', 'intergenic_length', 'upstream_gene', 'downstream_gene'
-        ]
+    # Define column headers
+    headers = [
+        'sample_name', 'intergenic_region_id', 'hit_origin', 'hit_gene', 'percent_identity',
+        'alignment_length', 'mismatches', 'gap_opens', 'query_start', 'query_end',
+        'subject_start', 'subject_end', 'evalue', 'bitscore', 'hit_title',
+        'intergenic_start', 'intergenic_end', 'intergenic_length', 'upstream_gene', 'downstream_gene'
+    ]
+    
+    # Sort BLAST results by E-value (smallest first)
+    sorted_blast_results = sorted(blast_results, key=lambda x: x.get('evalue', float('inf')))
+    
+    # Write TSV file
+    with open(output_file, 'w') as f:
+        # Write header
+        f.write('\t'.join(headers) + '\n')
         
-        # Sort BLAST results by E-value (smallest first)
-        sorted_blast_results = sorted(blast_results, key=lambda x: x.get('evalue', float('inf')))
+        # Write data
+        for result in sorted_blast_results:
+            row = [str(result.get(header, '')) for header in headers]
+            f.write('\t'.join(row) + '\n')
+    
+    logger.debug(f"{"[DEBUG]:":10} BLAST report written for {sample_name}: {output_file}")
         
-        # Write TSV file
-        with open(output_file, 'w') as f:
-            # Write header
-            f.write('\t'.join(headers) + '\n')
-            
-            # Write data
-            for result in sorted_blast_results:
-                row = [str(result.get(header, '')) for header in headers]
-                f.write('\t'.join(row) + '\n')
-        
-        if logger:
-            logger.debug(f"{"[DEBUG]:":10} BLAST report written for {sample_name}: {output_file}")
-        
-    except Exception as e:
-        if logger:
-            logger.error(f"{"[ERROR]:":10} Error writing BLAST report for {sample_name}: {str(e)}")
-            logger.error(traceback.format_exc())
-
+ 
 
 def parse_metadata_tsv(metadata_file_path, genome_fasta_dir, logger):
     """
@@ -3348,7 +3781,7 @@ def parse_metadata_tsv(metadata_file_path, genome_fasta_dir, logger):
             
     Raises:
         SystemExit: If the file cannot be parsed or contains invalid data
-"""
+    """
 
     logger.info(f"{"[INFO]:":10} Parsing metadata TSV file: {metadata_file_path}")
 
@@ -3509,7 +3942,9 @@ def main(args):
             getattr(args, 'chloe_project_dir', None),
             getattr(args, 'chloe_script', None),
             getattr(args, 'linearise_gene', 'psbA'),
-            metadata_dict
+            metadata_dict,
+            args.pool,
+            log_queue
         )
 
         # Check genes and write reports
@@ -3530,7 +3965,7 @@ def main(args):
             logger.info(f"{"[INFO]:":10} Skipping intergenic region analysis as requested") 
  
     except Exception as e:
-        utils.log_manager.handle_error(e, "main()")
+        utils.log_manager.handle_error(e, traceback.format_exc(), "main()")
 
     finally:
         # Log total completion time before cleaning up the logger
