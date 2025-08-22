@@ -3574,14 +3574,16 @@ def process_single_genome_intergenic(sample_data, log_queue=None):
             worker_logger.debug(f"{"[DEBUG]:":10} Processing sequence {i+1}/{len(gbk_files)}: {sequence_id}")
 
             # Extract intergenic regions
-            intergenic_regions = extract_intergenic_regions(gbk_file, fasta_file, min_intergenic_length, debug_intergenic, worker_logger)
+            intergenic_regions = extract_intergenic_regions(gbk_file, fasta_file, min_intergenic_length,
+                                                            debug_intergenic, worker_logger)
             
             if not intergenic_regions:
                 worker_logger.warning(f"{"[WARNING]:":10} No intergenic regions found for {sequence_id}")
                 continue
 
             # BLAST intergenic regions - use sequence_id to include sequence information
-            blast_results = blast_intergenic_regions(intergenic_regions, blast_db_path, blast_evalue, sequence_id, max_blast_hits, threads, worker_logger)
+            blast_results = blast_intergenic_regions(intergenic_regions, blast_db_path, blast_evalue, sequence_id,
+                                                     max_blast_hits, threads, worker_logger)
             all_blast_results.extend(blast_results)
         
         if not all_blast_results:
@@ -3643,7 +3645,7 @@ def blast_intergenic_regions(intergenic_regions, blast_db_path, evalue_threshold
         with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as temp_output:
             temp_output_path = temp_output.name
         
-        # Run BLAST
+        # Run BLAST with hardcoded max_target_seqs=500 to get more hits for filtering
         blast_cmd = [
             'blastn',
             '-db', blast_db_path,
@@ -3651,13 +3653,14 @@ def blast_intergenic_regions(intergenic_regions, blast_db_path, evalue_threshold
             '-out', temp_output_path,
             '-evalue', str(evalue_threshold),
             '-outfmt', '6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore stitle',
-            '-max_target_seqs', str(max_blast_hits),
+            '-max_target_seqs', '500',
             '-num_threads', str(threads)
         ]
         
         result = subprocess.run(blast_cmd, capture_output=True, text=True, check=True)
         
-        # Parse BLAST results
+        # Parse BLAST results and filter to max_blast_hits
+        region_blast_results = []
         with open(temp_output_path, 'r') as f:
             for line in f:
                 if line.strip():
@@ -3691,7 +3694,23 @@ def blast_intergenic_regions(intergenic_regions, blast_db_path, evalue_threshold
                             'upstream_gene': region['upstream_gene'],
                             'downstream_gene': region['downstream_gene']
                         }
-                        blast_results.append(blast_result)
+                        region_blast_results.append(blast_result)
+        
+        # Filter to max_blast_hits (sorted by E-value, smallest first) and remove duplicates
+        region_blast_results.sort(key=lambda x: x['evalue'])
+        
+        # Remove duplicates based on hit_origin and hit_gene combination
+        seen_hits = set()
+        unique_results = []
+        for result in region_blast_results:
+            hit_key = (result['hit_origin'], result['hit_gene'])
+            if hit_key not in seen_hits:
+                seen_hits.add(hit_key)
+                unique_results.append(result)
+                if len(unique_results) >= max_blast_hits:
+                    break
+        
+        blast_results.extend(unique_results)
         
         # Clean up temporary files
         os.unlink(temp_fasta_path)

@@ -347,7 +347,6 @@ Reference sequences are named using the format: `{Order}_{Family}_{Genus}_{Speci
 
 ### Input
 - **FASTA**: Genome assemblies (.fasta, .fa, .fas)
-- **Compressed**: Supports .gz compression
 
 ### Output
 - **GenBank**: Annotated genomes in GenBank format
