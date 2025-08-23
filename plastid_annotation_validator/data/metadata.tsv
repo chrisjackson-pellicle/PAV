@@ -1,4 +1,6 @@
-fasta_filename	project_id	locus_tag	genus_species	linear_or_circular
+input_filename	project_id	locus_tag	genus_species	linear_or_circular
 sample1.fasta	PRJEB12345	ABC	Arabidopsis thaliana	circular
-sample2.fasta	PRJEB67890	XYZ	Oryza sativa	linear
+sample2.fasta	PRJEB98765	XYZ	Oryza sativa	linear
+sample3.fasta				circular
+sample4.fasta	PRJEB11111		Zea mays	circular
 

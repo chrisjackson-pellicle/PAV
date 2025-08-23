@@ -144,8 +144,8 @@ def annotate_and_check_parser(subparsers):
     required_positional_group.add_argument('metadata_tsv',
                                 metavar='TSV',
                                 help='TSV file containing sample metadata for EMBL conversion. Required file should contain columns: '
-                                'fasta_filename, project_id, locus_tag, genus_species, linear_or_circular. '
-                                'ALL samples must be listed. Only fasta_filename and linear_or_circular require values; '
+                                'input_filename, project_id, locus_tag, genus_species, linear_or_circular. '
+                                'ALL samples must be listed. Only input_filename and linear_or_circular require values; '
                                 'empty optional fields will use defaults. linear_or_circular must be "linear" or "circular".')
 
     # Add all argument groups using helper functions
@@ -175,12 +175,14 @@ def check_parser(subparsers):
                                 metavar='DIR',
                                 help='Directory containing already annotated GenBank files.')
     
-    required_positional_group.add_argument('metadata_tsv',
+    # Add optional arguments
+    optional_group_general = parser_check.add_argument_group('Optional input')
+    optional_group_general.add_argument('--metadata_tsv',
                                 metavar='TSV',
-                                help='TSV file containing sample metadata for EMBL conversion. Required file should contain columns: '
-                                'fasta_filename, project_id, locus_tag, genus_species, linear_or_circular. '
-                                'ALL samples must be listed. Only fasta_filename and linear_or_circular require values; '
-                                'empty optional fields will use defaults. linear_or_circular must be "linear" or "circular".')
+                                default=None,
+                                help='TSV file containing sample metadata for EMBL conversion. If not provided, samples '
+                                'will be processed without metadata.')
+
 
     # Add all argument groups using helper functions (excluding chloë options)
     _add_gene_length_warnings_group(parser_check)

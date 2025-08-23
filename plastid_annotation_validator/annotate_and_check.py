@@ -40,8 +40,6 @@ License: See LICENSE file
 
 import os
 import sys
-import gzip
-import warnings
 from collections import defaultdict
 from Bio import SeqIO
 from Bio.SeqRecord import SeqRecord
@@ -123,7 +121,7 @@ def load_gene_median_lengths():
     return gene_median_lengths
 
 
-def parse_gbk_genes(gbk_file_path, fasta_file_path, logger, gene_synonyms=None):
+def parse_gbk_genes(gbk_file_path, logger, gene_synonyms=None):
     """
     Parse gene annotations from a GenBank file and extract gene lengths, CDS, rRNA, and tRNA information.
     
@@ -136,7 +134,6 @@ def parse_gbk_genes(gbk_file_path, fasta_file_path, logger, gene_synonyms=None):
     
     Args:
         gbk_file_path (str): Path to the GenBank file (.gb or .gbk)
-        fasta_file_path (str): Path to the corresponding FASTA file for sequence length validation
         logger: Logger instance for logging messages and debugging
         gene_synonyms (dict, optional): Dictionary mapping gene names to standardized synonyms.
             Used to normalize gene naming across different annotation sources.
@@ -389,7 +386,6 @@ def check_single_sample_genes(sample_data, gene_median_lengths, min_threshold, m
         sample_data (dict): Dictionary containing sample information with keys:
             - 'sample_name': Name of the sample being processed
             - 'gbk_files': List of paths to annotated GenBank files
-            - 'fasta_files': List of paths to corresponding FASTA files
         gene_median_lengths (dict): Dictionary mapping gene names to their reference median lengths
         min_threshold (float): Minimum acceptable length as percentage of median (e.g., 0.8 for 80%)
         max_threshold (float): Maximum acceptable length as percentage of median (e.g., 1.2 for 120%)
@@ -405,7 +401,6 @@ def check_single_sample_genes(sample_data, gene_median_lengths, min_threshold, m
                 - 'sample_name': Name of the processed sample
                 - 'sequence_gene_data': Dictionary mapping sequence names to gene data containing:
                     - 'gbk_file': Path to GenBank file for this sequence
-                    - 'fasta_file': Path to FASTA file for this sequence
                     - 'gene_cds_info': CDS information for this sequence
                     - 'gene_rRNA_info': rRNA information for this sequence
                     - 'gene_tRNA_info': tRNA information for this sequence
@@ -443,7 +438,6 @@ def check_single_sample_genes(sample_data, gene_median_lengths, min_threshold, m
 
         sample_name = sample_data.get('sample_name', 'unknown')
         gbk_files = sample_data['gbk_files']
-        fasta_files = sample_data['fasta_files']
 
         length_warnings = set()
         
@@ -454,9 +448,9 @@ def check_single_sample_genes(sample_data, gene_median_lengths, min_threshold, m
         combined_gene_tRNA_info = {}
         
         # Process each file for a sample and combine the results
-        for gbk_file, fasta_file in zip(gbk_files, fasta_files):
+        for gbk_file in gbk_files:
             # Parse gene lengths and CDS information from GenBank file (adjusted in-memory)
-            gene_data, gene_cds_info, gene_rRNA_info, gene_tRNA_info = parse_gbk_genes(gbk_file, fasta_file,
+            gene_data, gene_cds_info, gene_rRNA_info, gene_tRNA_info = parse_gbk_genes(gbk_file,
                                                                                        worker_logger, gene_synonyms)
 
             # Store individual sequence data for reporting
@@ -471,7 +465,6 @@ def check_single_sample_genes(sample_data, gene_median_lengths, min_threshold, m
             # Store individual sequence data with validation fields initialized
             sequence_gene_data[seq_name] = {
                 'gbk_file': gbk_file,
-                'fasta_file': fasta_file,
                 'gene_cds_info': gene_cds_info,
                 'gene_rRNA_info': gene_rRNA_info,
                 'gene_tRNA_info': gene_tRNA_info,
@@ -520,8 +513,6 @@ def check_single_sample_genes(sample_data, gene_median_lengths, min_threshold, m
             all_gene_names.update(seq_data['sequence_gene_data'].keys())
 
         all_gene_names_no_copy_suffix = set([gene_name.split('_copy_')[0] for gene_name in all_gene_names])
-
-        # print(f'all_gene_names: {all_gene_names}')
         
         # Check for genes in CDS info that are not in gene lengths
         cds_only_genes = set(combined_gene_cds_info.keys()) - all_gene_names
@@ -597,7 +588,6 @@ def check_single_sample_genes(sample_data, gene_median_lengths, min_threshold, m
         # Collate results for return
         result_dict = {
             'sample_name': sample_name,
-            'gene_results': {},  # No longer needed - data is in sequence_gene_data
             'total_genes': len(all_gene_names),
             'genes_with_warnings': len(length_warnings),
             'gene_cds_info': combined_gene_cds_info,
@@ -629,7 +619,6 @@ def check_genes(gene_median_lengths, annotated_genomes_dict, min_threshold, max_
         gene_median_lengths (dict): Dictionary mapping gene names to their reference median lengths
         annotated_genomes_dict (dict): Dictionary mapping sample names to dicts containing:
             - 'gbk': Path to annotated GenBank file (single) or list of paths (multi-sequence)
-            - 'fasta': Path to corresponding FASTA file (single) or list of paths (multi-sequence)
             - 'is_multi_sequence': Boolean indicating if this is a multi-sequence sample
             - 'sequence_count': Number of sequences in this sample
         min_threshold (float): Minimum acceptable length as percentage of median (e.g., 80.0 for 80%)
@@ -671,14 +660,11 @@ def check_genes(gene_median_lengths, annotated_genomes_dict, min_threshold, max_
         if isinstance(data['gbk'], list):
             # Multi-sequence sample - collect all files
             gbk_files = data['gbk']
-            fasta_files = data['fasta']
         else:
             # Single sequence sample - convert to lists for consistent processing
             gbk_files = [data['gbk']]
-            fasta_files = [data['fasta']]
         
         sample_data = {
-            'fasta_files': fasta_files,
             'gbk_files': gbk_files,
             'sample_name': sample_name
         }
@@ -2353,8 +2339,8 @@ def linearise_genome_upstream_gene(gbk_file, fasta_file, output_dir, sample_name
         return fasta_file
 
 
-def process_single_sequence(fasta_file, output_dir, sequence_name, chloe_project_dir, chloe_script_path, linearise_gene, metadata_dict, 
-                            original_fasta_name, logger=None):
+def process_single_sequence(fasta_file, output_dir, sequence_name, chloe_project_dir, chloe_script_path, linearise_gene, 
+                            metadata_dict, original_fasta_name, logger=None):
     """
     Process a single sequence file with Chloë annotation.
     
@@ -2370,7 +2356,7 @@ def process_single_sequence(fasta_file, output_dir, sequence_name, chloe_project
         logger: Logger instance for logging messages
         
     Returns:
-        dict: Dictionary with file paths for this sequence
+        dict: Dictionary with GenBank and GFF file paths for this sequence
     """
     # Define output file paths for this sequence
     output_gbk = os.path.join(output_dir, f"{sequence_name}.chloe.gbk")
@@ -2388,8 +2374,11 @@ def process_single_sequence(fasta_file, output_dir, sequence_name, chloe_project
         os.remove(output_gff)
 
     # Determine what needs to be done
-    has_original_annotation = utils.file_exists_and_not_empty(output_gbk_original) and utils.file_exists_and_not_empty(output_gff_original)
-    has_linearised_annotation_and_fasta = utils.file_exists_and_not_empty(output_gbk_linearised) and utils.file_exists_and_not_empty(output_gff_linearised) and utils.file_exists_and_not_empty(output_fasta_linearised)
+    has_original_annotation = (utils.file_exists_and_not_empty(output_gbk_original) and 
+                               utils.file_exists_and_not_empty(output_gff_original))
+    has_linearised_annotation_and_fasta = (utils.file_exists_and_not_empty(output_gbk_linearised) and 
+                                           utils.file_exists_and_not_empty(output_gff_linearised) and 
+                                           utils.file_exists_and_not_empty(output_fasta_linearised))
     
     if has_linearised_annotation_and_fasta:
         logger.debug(f"{"[INFO]:":10} {sequence_name} already completely processed with linearised sequence")
@@ -2505,13 +2494,13 @@ def process_single_sequence(fasta_file, output_dir, sequence_name, chloe_project
         return {
             'gbk': output_gbk_linearised,
             'gff': output_gff_linearised,
-            'fasta': output_fasta_linearised
+            # 'fasta': output_fasta_linearised
         }
     else:
         return {
             'gbk': output_gbk_original,
             'gff': output_gff_original,
-            'fasta': fasta_file
+            # 'fasta': fasta_file
         }
 
 
@@ -2618,24 +2607,18 @@ def process_single_fasta_file(fasta_file, annotated_genomes_dir, chloe_project_d
         worker_logger = utils.setup_worker_logger(__name__, log_queue)
         
         # Get the basename and filename prefix
-        basename = os.path.basename(fasta_file)
-        filename_prefix = os.path.splitext(basename)[0]
+        input_basename = os.path.basename(fasta_file)
+        filename_prefix = os.path.splitext(input_basename)[0]
 
-        # Remove additional extensions if present (e.g., .fasta.gz -> .fasta)
-        if filename_prefix.endswith('.fasta'):
-            filename_prefix = filename_prefix[:-6]  # Remove .fasta
-        elif filename_prefix.endswith('.fa'):
-            filename_prefix = filename_prefix[:-3]  # Remove .fa
-        elif filename_prefix.endswith('.fas'):
-            filename_prefix = filename_prefix[:-4]  # Remove .fas
-
+        # Remove additional extensions if present 
+        filename_prefix = os.path.splitext(input_basename)[0]
         filename_prefix_no_dots = filename_prefix.replace('.', '_')
 
         # Check if this is a multi-sequence FASTA file
         is_multi_sequence, sequence_count = detect_multi_sequence_fasta(fasta_file, worker_logger)
         
         if is_multi_sequence:
-            worker_logger.debug(f"{"[DEBUG]:":10} Multi-sequence FASTA detected: {basename} ({sequence_count} sequences)")
+            worker_logger.debug(f"{"[DEBUG]:":10} Multi-sequence FASTA detected: {input_basename} ({sequence_count} sequences)")
             
             # Create a subdirectory for this multi-sequence sample
             output_sample_dir = os.path.join(annotated_genomes_dir, filename_prefix_no_dots)
@@ -2646,12 +2629,12 @@ def process_single_fasta_file(fasta_file, annotated_genomes_dir, chloe_project_d
                                                                    worker_logger)
             
             if not individual_sequence_files:
-                worker_logger.error(f"{"[ERROR]:":10} Failed to split multi-sequence FASTA file: {basename}")
-                return False, (f'Failed to split multi-sequence FASTA file: {basename}', traceback.format_exc())
+                worker_logger.error(f"{"[ERROR]:":10} Failed to split multi-sequence FASTA file: {input_basename}")
+                return False, (f'Failed to split multi-sequence FASTA file: {input_basename}', traceback.format_exc())
             
             # Initialize dict for multi-sequence sample data
             sample_data = {
-                'original_fasta': basename,
+                'input_filename': input_basename,
                 'is_multi_sequence': True,
                 'sequence_count': sequence_count,
                 'sequences': {}
@@ -2673,7 +2656,7 @@ def process_single_fasta_file(fasta_file, annotated_genomes_dir, chloe_project_d
                     chloe_script_path, 
                     linearise_gene, 
                     metadata_dict, 
-                    basename,  # Original multi-sequence filename for metadata lookup
+                    input_basename,  # Original multi-sequence filename for metadata lookup
                     worker_logger
                 )
                 
@@ -2686,27 +2669,27 @@ def process_single_fasta_file(fasta_file, annotated_genomes_dir, chloe_project_d
                 # Store all individual sequence files
                 all_gbk_files = []
                 all_gff_files = []
-                all_fasta_files = []
+                # all_fasta_files = []
                 
                 for seq_name, seq_result in sample_data['sequences'].items():
                     all_gbk_files.append(seq_result['gbk'])
                     all_gff_files.append(seq_result['gff'])
-                    all_fasta_files.append(seq_result['fasta'])
+                    # all_fasta_files.append(seq_result['fasta'])
                 
                 # Store all files in the main dictionary
                 sample_data['gbk'] = all_gbk_files
                 sample_data['gff'] = all_gff_files
-                sample_data['fasta'] = all_fasta_files
+                # sample_data['fasta'] = all_fasta_files
             
             return True, (filename_prefix_no_dots, sample_data)
         
         else:
             # Single sequence FASTA - process as before
-            worker_logger.debug(f"{"[DEBUG]:":10} Single sequence FASTA: {basename}")
+            worker_logger.debug(f"{"[DEBUG]:":10} Single sequence FASTA: {input_basename}")
             
             # Initialize dict for single sequence sample data
             sample_data = {
-                'original_fasta': basename,
+                'input_filename': input_basename,
                 'is_multi_sequence': False,
                 'sequence_count': 1
             }
@@ -2720,7 +2703,7 @@ def process_single_fasta_file(fasta_file, annotated_genomes_dir, chloe_project_d
                 chloe_script_path, 
                 linearise_gene, 
                 metadata_dict, 
-                basename,
+                input_basename,
                 worker_logger
             )
             
@@ -2740,14 +2723,11 @@ def convert_gbk_to_embl(annotated_genomes_dict, output_directory, metadata_dict=
     Args:
         annotated_genomes_dict (dict): Dictionary of annotated genome information
         output_directory (str): Output directory for EMBL files
-        metadata_dict (dict, optional): Dictionary mapping fasta_filename to metadata containing:
+        metadata_dict (dict, optional): Dictionary mapping input_filename to metadata containing:
             - project_id: Project identifier
             - locus_tag: Locus tag prefix
             - genus_species: Genus and species name
-            - authors: Author list
-            - manuscript_title: Manuscript title
-            - journal_name: Journal name
-            - complete_or_partial: Genome completeness status
+            - linear_or_circular: Genome topology (linear or circular)
     
     Returns:
         None
@@ -2773,7 +2753,6 @@ def convert_gbk_to_embl(annotated_genomes_dict, output_directory, metadata_dict=
             continue
             
         gbk_files = genome_info.get('gbk')
-        fasta_files = genome_info.get('fasta')
         
         # Handle both single files and lists of files (for multi-sequence samples)
         if isinstance(gbk_files, list):
@@ -2781,45 +2760,36 @@ def convert_gbk_to_embl(annotated_genomes_dict, output_directory, metadata_dict=
             if not gbk_files or not all(os.path.exists(f) for f in gbk_files):
                 logger.warning(f"{"[WARNING]:":10} One or more GenBank files not found for {sample_name}")
                 continue
-            if not fasta_files or not all(os.path.exists(f) for f in fasta_files):
-                logger.warning(f"{"[WARNING]:":10} One or more Fasta files not found for {sample_name}")
-                continue
         else:
             # Single sequence sample
             if not gbk_files or not os.path.exists(gbk_files):
                 logger.warning(f"{"[WARNING]:":10} GenBank file not found for {sample_name}")
                 continue
-            if not fasta_files or not os.path.exists(fasta_files):
-                logger.warning(f"{"[WARNING]:":10} Fasta file not found for {sample_name}")
-                continue
             # Convert to lists for consistent processing
             gbk_files = [gbk_files]
-            fasta_files = [fasta_files]
         
         # Get fasta filename for metadata lookup
-        fasta_filename = genome_info['original_fasta']
+        input_filename = genome_info['input_filename']
         
-        # Get metadata for this sample (all samples must be in metadata by this point)
-        if fasta_filename in metadata_dict:
-            sample_metadata = metadata_dict[fasta_filename]
+        # Get metadata for this sample (all samples must be in metadata by this point if running main() for subcommand `annotate_and_check`)
+        if metadata_dict and input_filename in metadata_dict:
+            sample_metadata = metadata_dict[input_filename]
             samples_with_metadata += 1
-            logger.debug(f"{"[DEBUG]:":10} Using metadata for {sample_name} (fasta: {fasta_filename})")
+            logger.debug(f"{"[DEBUG]:":10} Using metadata for {sample_name} (fasta: {input_filename})")
+ 
+            # Extract some metadata values here
+            locus_tag_prefix = sample_metadata['locus_tag']
+            genus_species = sample_metadata['genus_species']
         else:
-            # This should not happen if metadata coverage was validated during parsing
-            logger.error(f"{"[ERROR]:":10} Sample {sample_name} (fasta: {fasta_filename}) not found in metadata!")
-            logger.error(f"{"":10} All samples must be present in metadata file")
-            utils.exit_program()
-        
-        # Extract metadata values
-        locus_tag_prefix = sample_metadata['locus_tag']
-        project_id = sample_metadata['project_id']
-        genus_species = sample_metadata['genus_species']
-        linear_or_circular = sample_metadata['linear_or_circular']
+            logger.debug(f"{"[DEBUG]:":10} No metadata found for {sample_name} (fasta: {input_filename})")
+            locus_tag_prefix = 'DEFAULT_TAG'
+            genus_species = 'Unknown species'
+            sample_metadata = None
             
         # Process each file in the lists and collect ENA EMBL files for concatenation
         ena_embl_files = []
         
-        for file_idx, (gbk_file, fasta_file) in enumerate(zip(gbk_files, fasta_files)):
+        for file_idx, gbk_file in enumerate(gbk_files):
             try:
                 # For multi-sequence samples, create sequence-specific names
                 if len(gbk_files) > 1:
@@ -3071,7 +3041,7 @@ def convert_embl_to_ena_template(embl_filepath, sample_metadata, record_seq_leng
     lines_to_write = []
     space_line_template = 'XX'
 
-    id_line_template = f"ID   XXX; XXX; {sample_metadata['linear_or_circular']}; XXX; XXX; XXX; XXX."
+    id_line_template = f"ID   XXX; XXX; {sample_metadata['linear_or_circular'] if sample_metadata else 'unknown'}; XXX; XXX; XXX; XXX."
     lines_to_write.append(id_line_template)
     lines_to_write.append(space_line_template)
 
@@ -3083,7 +3053,7 @@ def convert_embl_to_ena_template(embl_filepath, sample_metadata, record_seq_leng
     lines_to_write.append(ac_line_template_2)
     lines_to_write.append(space_line_template)
 
-    pr_line_template = f"PR   Project:{sample_metadata['project_id']};"
+    pr_line_template = f"PR   Project:{sample_metadata['project_id'] if sample_metadata else 'UNKNOWN_PROJECT'};"
     lines_to_write.append(pr_line_template)
     lines_to_write.append(space_line_template)
 
@@ -3213,10 +3183,9 @@ def query_intergenic_regions(annotated_genomes_dict, output_directory, min_inter
         if is_multi_sequence:
             # Multi-sequence sample - get lists of files
             gbk_files = genome_info.get('gbk', [])
-            fasta_files = genome_info.get('fasta', [])
             
-            if not gbk_files or not fasta_files:
-                logger.warning(f"{"[WARNING]:":10} Skipping {sample_name} - missing GenBank or FASTA files")
+            if not gbk_files:
+                logger.warning(f"{"[WARNING]:":10} Skipping {sample_name} - missing GenBankfiles")
                 continue
                 
             # Create sample data for multi-sequence processing
@@ -3224,7 +3193,6 @@ def query_intergenic_regions(annotated_genomes_dict, output_directory, min_inter
                 'sample_name': sample_name,
                 'genome_info': genome_info,
                 'gbk_files': gbk_files,
-                'fasta_files': fasta_files,
                 'is_multi_sequence': True,
                 'blast_db_path': blast_db_path,
                 'min_intergenic_length': min_intergenic_length,
@@ -3237,10 +3205,9 @@ def query_intergenic_regions(annotated_genomes_dict, output_directory, min_inter
         else:
             # Single sequence sample - get single file paths
             gbk_file = genome_info.get('gbk')
-            fasta_file = genome_info.get('fasta')
             
-            if not gbk_file or not fasta_file:
-                logger.warning(f"{"[WARNING]:":10} Skipping {sample_name} - missing GenBank or FASTA files")
+            if not gbk_file:
+                logger.warning(f"{"[WARNING]:":10} Skipping {sample_name} - missing GenBank files")
                 continue
                 
             # Create sample data for single sequence processing
@@ -3248,7 +3215,6 @@ def query_intergenic_regions(annotated_genomes_dict, output_directory, min_inter
                 'sample_name': sample_name,
                 'genome_info': genome_info,
                 'gbk_files': [gbk_file],
-                'fasta_files': [fasta_file],
                 'is_multi_sequence': False,
                 'blast_db_path': blast_db_path,
                 'min_intergenic_length': min_intergenic_length,
@@ -3321,13 +3287,12 @@ def query_intergenic_regions(annotated_genomes_dict, output_directory, min_inter
     utils.log_separator(logger)
 
 
-def extract_intergenic_regions(gbk_file, fasta_file, min_length=50, debug_intergenic=False, logger=None):
+def extract_intergenic_regions(gbk_file, min_length=50, debug_intergenic=False, logger=None):
     """
     Extract intergenic regions from a GenBank file.
     
     Args:
         gbk_file (str): Path to GenBank file
-        fasta_file (str): Path to corresponding FASTA file
         min_length (int): Minimum length of intergenic region to extract
     
     Returns:
@@ -3541,7 +3506,6 @@ def process_single_genome_intergenic(sample_data, log_queue=None):
         
         sample_name = sample_data['sample_name']
         gbk_files = sample_data['gbk_files']
-        fasta_files = sample_data['fasta_files']
         is_multi_sequence = sample_data['is_multi_sequence']
         blast_db_path = sample_data['blast_db_path']
         min_intergenic_length = sample_data['min_intergenic_length']
@@ -3556,14 +3520,10 @@ def process_single_genome_intergenic(sample_data, log_queue=None):
             if not os.path.exists(gbk_file):
                 return False, f"GenBank file not found: {gbk_file}"
         
-        for fasta_file in fasta_files:
-            if not os.path.exists(fasta_file):
-                return False, f"FASTA file not found: {fasta_file}"
-
         # Process all sequences for this sample
         all_blast_results = []
         
-        for i, (gbk_file, fasta_file) in enumerate(zip(gbk_files, fasta_files)):
+        for i, gbk_file in enumerate(gbk_files):
             # Extract sequence name for multi-sequence samples
             if is_multi_sequence:
                 seq_basename = os.path.basename(gbk_file)
@@ -3585,7 +3545,7 @@ def process_single_genome_intergenic(sample_data, log_queue=None):
             worker_logger.debug(f"{"[DEBUG]:":10} Processing sequence {i+1}/{len(gbk_files)}: {sequence_id}")
 
             # Extract intergenic regions
-            intergenic_regions = extract_intergenic_regions(gbk_file, fasta_file, min_intergenic_length,
+            intergenic_regions = extract_intergenic_regions(gbk_file, min_intergenic_length,
                                                             debug_intergenic, worker_logger)
             
             if not intergenic_regions:
@@ -3822,22 +3782,23 @@ def write_blast_report(blast_results, output_file, sample_name, logger):
         
  
 
-def parse_metadata_tsv(metadata_file_path, genome_fasta_dir, ):
+def parse_metadata_tsv(metadata_file_path, input_file_dir, entry='main'):
     """
     Parse and validate the metadata TSV file for EMBL conversion.
     
     This function reads a TSV file containing sample metadata and validates:
     1. File format and required columns
-    2. Data completeness for required fields (fasta_filename, linear_or_circular)
+    2. Data completeness for required fields (input_filename, linear_or_circular)
     3. Uses defaults for optional empty fields (project_id, locus_tag, genus_species)
-    4. Validates that ALL FASTA files in the genome directory have metadata entries
+    4. Validates that ALL INPUT files in the input directory have metadata entries if entry is not provided
     
     Args:
         metadata_file_path (str): Path to the metadata TSV file
-        genome_fasta_dir (str): Path to directory containing genome fasta files
+        input_file_dir (str): Path to directory containing input files
+        entry (str): Optional entry name to parse. 
         
     Returns:
-        dict: Dictionary mapping fasta_filename to metadata dictionary containing:
+        dict: Dictionary mapping input_filename to metadata dictionary containing:
             - project_id: Project identifier (uses default if empty)
             - locus_tag: Locus tag prefix (uses default if empty)
             - genus_species: Genus and species name (uses default if empty)
@@ -3850,100 +3811,127 @@ def parse_metadata_tsv(metadata_file_path, genome_fasta_dir, ):
     logger.info(f"{"[INFO]:":10} Parsing metadata TSV file: {metadata_file_path}")
 
     required_columns = [
-        'fasta_filename', 'project_id', 'locus_tag', 'genus_species', 'linear_or_circular'
+        'input_filename', 'project_id', 'locus_tag', 'genus_species', 'linear_or_circular'
     ]
-    
+
     try:
         # Read the TSV file
         metadata_df = pd.read_csv(metadata_file_path, sep='\t', dtype=str)
         
         # Check for required columns
-        missing_columns = set(required_columns) - set(metadata_df.columns)
-        if missing_columns:
-            logger.error(f"{"[ERROR]:":10} Missing required columns in metadata TSV: {missing_columns}")
-            logger.error(f"{"":10} Required columns: {required_columns}")
-            utils.exit_program()
-        
-        # Check for empty dataframe
-        if metadata_df.empty:
-            logger.error(f"{"[ERROR]:":10} Metadata TSV file is empty")
-            utils.exit_program()
-        
-        # Check for duplicate fasta filenames
-        duplicates = metadata_df[metadata_df.duplicated(['fasta_filename'], keep=False)]
-        if not duplicates.empty:
-            logger.error(f"{"[ERROR]:":10} Duplicate fasta_filename entries found:")
-            for _, row in duplicates.iterrows():
-                logger.error(f"{"":10} {row['fasta_filename']}")
-            utils.exit_program()
-        
-        # Check for missing values in required fields (only fasta_filename and linear_or_circular must have values)
-        required_fields = ['fasta_filename', 'linear_or_circular']
-        for field in required_fields:
-            missing_values = metadata_df[metadata_df[field].isna() | (metadata_df[field] == '')]
-            if not missing_values.empty:
-                logger.error(f"{"[ERROR]:":10} Missing values in required field '{field}':")
-                for _, row in missing_values.iterrows():
-                    logger.error(f"{"":10} {row['fasta_filename']}")
+        if entry == 'main': # i.e. running main() for subcommand `annotate_and_check` - otherwise metadata is optional
+            missing_columns = set(required_columns) - set(metadata_df.columns)
+            if missing_columns:
+                logger.error(f"{"[ERROR]:":10} Missing required columns in metadata TSV: {missing_columns}")
+                logger.error(f"{"":10} Required columns: {required_columns}")
                 utils.exit_program()
         
-        # Validate linear_or_circular values
-        valid_topologies = {'linear', 'circular'}
-        invalid_topologies = metadata_df[~metadata_df['linear_or_circular'].isin(valid_topologies)]
-        if not invalid_topologies.empty:
-            logger.error(f"{"[ERROR]:":10} Invalid values in 'linear_or_circular' field. Must be 'linear' or 'circular':")
-            for _, row in invalid_topologies.iterrows():
-                logger.error(f"{"":10} fasta_filename: {row['fasta_filename']}, value: '{row['linear_or_circular']}'")
+            # Check for empty dataframe
+            if metadata_df.empty:
+                logger.error(f"{"[ERROR]:":10} Metadata TSV file is empty")
+                utils.exit_program()
+
+            # Check for missing values in required fields (only input_filename and linear_or_circular must have values)
+            required_fields = ['input_filename', 'linear_or_circular']
+            for field in required_fields:
+                missing_values = metadata_df[metadata_df[field].isna() | (metadata_df[field] == '')]
+                if not missing_values.empty:
+                    logger.error(f"{"[ERROR]:":10} Missing values in required field '{field}':")
+                    for _, row in missing_values.iterrows():
+                        logger.error(f"{"":10} {row['input_filename']}")
+                    utils.exit_program()
+
+            # Validate linear_or_circular values
+            valid_topologies = {'linear', 'circular'}
+            invalid_topologies = metadata_df[~metadata_df['linear_or_circular'].isin(valid_topologies)]
+            if not invalid_topologies.empty:
+                logger.error(f"{"[ERROR]:":10} Invalid values in 'linear_or_circular' field. Must be 'linear' or 'circular':")
+                for _, row in invalid_topologies.iterrows():
+                    logger.error(f"{"":10} input_filename: {row['input_filename']}, value: '{row['linear_or_circular']}'")
+                utils.exit_program()
+        
+        # Check for duplicate input filenames
+        duplicates = metadata_df[metadata_df.duplicated(['input_filename'], keep=False)]
+        if not duplicates.empty:
+            logger.error(f"{"[ERROR]:":10} Duplicate input_filename entries found:")
+            for _, row in duplicates.iterrows():
+                logger.error(f"{"":10} {row['input_filename']}")
             utils.exit_program()
         
         # Convert to dictionary, using defaults for empty optional fields
         metadata_dict = {}
         
         for _, row in metadata_df.iterrows():
-            fasta_filename = row['fasta_filename'].strip()
-            metadata_dict[fasta_filename] = {
-                'project_id': row.get('project_id', '').strip() or 'UNKNOWN_PROJECT',
-                'locus_tag': row.get('locus_tag', '').strip() or 'DEFAULT_TAG',
-                'genus_species': row.get('genus_species', '').strip() or 'Unknown species',
-                'linear_or_circular': row['linear_or_circular'].strip()
+            
+            # Helper function to safely get and strip values, handling NaN
+            def safe_get_strip(value, default):
+                if pd.isna(value):
+                    return default
+                return str(value).strip() or default
+            
+            # Handle input_filename (required field)
+            input_filename_raw = row['input_filename']
+            if pd.isna(input_filename_raw):
+                logger.warning(f"{"[WARNING]:":10} Skipping row with missing 'input_filename' field")
+                continue
+            input_filename = safe_get_strip(input_filename_raw, '')
+            
+            if not input_filename:
+                logger.warning(f"{"[WARNING]:":10} Skipping row with empty 'input_filename' field")
+                continue
+
+            metadata_dict[input_filename] = {
+                'project_id': safe_get_strip(row.get('project_id'), 'UNKNOWN_PROJECT'),
+                'locus_tag': safe_get_strip(row.get('locus_tag'), 'DEFAULT_TAG'),
+                'genus_species': safe_get_strip(row.get('genus_species'), 'Unknown species'),
+                'linear_or_circular': safe_get_strip(row.get('linear_or_circular'), 'unknown')
             }
         
         logger.debug(f"{"[DEBUG]:":10} Successfully parsed metadata TSV file: {len(metadata_dict)} samples")
         logger.debug(f"{"[DEBUG]:":10} Sample entries: {list(metadata_dict.keys())[:5]}")
         
-        # Check that all FASTA files in the input directory have metadata entries
-        fasta_files = glob.glob(os.path.join(genome_fasta_dir, "*.fasta")) + \
-                     glob.glob(os.path.join(genome_fasta_dir, "*.fa")) + \
-                     glob.glob(os.path.join(genome_fasta_dir, "*.fas"))
-        
-        if not fasta_files:
-            logger.warning(f"{"[WARNING]:":10} No FASTA files found in {genome_fasta_dir}")
+        # Check that all INPUT files in the input directory have metadata entries
+        if entry == 'main':
+            input_files = glob.glob(os.path.join(input_file_dir, "*.fasta")) + \
+                     glob.glob(os.path.join(input_file_dir, "*.fa")) + \
+                     glob.glob(os.path.join(input_file_dir, "*.fas"))
+            
+        elif entry == 'check':
+            input_files = glob.glob(os.path.join(input_file_dir, "*.gb")) + \
+                     glob.glob(os.path.join(input_file_dir, "*.gbk")) + \
+                     glob.glob(os.path.join(input_file_dir, "*.gb.gz")) + \
+                     glob.glob(os.path.join(input_file_dir, "*.gbk.gz"))
         else:
-            # Get list of FASTA filenames that should be in metadata
-            expected_fasta_files = []
-            for fasta_file in fasta_files:
-                fasta_filename = os.path.basename(fasta_file)
-                expected_fasta_files.append(fasta_filename)
+            input_files = glob.glob(os.path.join(input_file_dir, "*"))  # not specific to file extension
+        
+        if not input_files:
+            logger.warning(f"{"[WARNING]:":10} No INPUT files found in {input_file_dir}")
+        else:
+            # Get list of INPUT filenames that should be in metadata
+            expected_input_files = []
+            for input_file in input_files:
+                input_filename = os.path.basename(input_file)
+                expected_input_files.append(input_filename)
             
             # Check for missing metadata entries
             missing_from_metadata = []
-            for fasta_filename in expected_fasta_files:
-                if fasta_filename not in metadata_dict:
-                    missing_from_metadata.append(fasta_filename)
+            for input_filename in expected_input_files:
+                if input_filename not in metadata_dict:
+                    missing_from_metadata.append(input_filename)
             
             logger.info(f"{"[INFO]:":10} Metadata coverage: "
-                        f"{len(expected_fasta_files) - len(missing_from_metadata)}/{len(expected_fasta_files)} samples")
+                        f"{len(expected_input_files) - len(missing_from_metadata)}/{len(expected_input_files)} samples")
             
-            if missing_from_metadata:
-                logger.error(f"{"[ERROR]:":10} ALL samples must be present in metadata file!")
-                logger.error(f"{"":10} {len(missing_from_metadata)} samples are missing from metadata:")
-                for fasta_filename in missing_from_metadata:
-                    logger.error(f"{"":15} {fasta_filename}")
-                logger.error(f"{"":10} Please add all missing samples to your metadata TSV file")
-                utils.exit_program()
+            if entry == 'main': # i.e. running main() for subcommand `annotate_and_check` - otherwise metadata is optional
+                if missing_from_metadata:
+                    logger.error(f"{"[ERROR]:":10} ALL samples must be present in metadata file!")
+                    logger.error(f"{"":10} {len(missing_from_metadata)} samples are missing from metadata:")
+                    for input_filename in missing_from_metadata:
+                        logger.error(f"{"":15} {input_filename}")
+                    logger.error(f"{"":10} Please add all missing samples to your metadata TSV file")
+                    utils.exit_program()
         
         utils.log_separator(logger)
-
         return metadata_dict
         
     except pd.errors.EmptyDataError:
@@ -3958,19 +3946,23 @@ def parse_metadata_tsv(metadata_file_path, genome_fasta_dir, ):
         utils.exit_program()
 
 
-def load_annotated_genbank_files(genbank_dir, metadata_dict, logger):
+def load_annotated_genbank_files(genbank_dir, output_directory, logger):
     """
     Load already annotated GenBank files into the annotated_genomes_dict structure.
     
     Args:
         genbank_dir (str): Directory containing annotated GenBank files
-        metadata_dict (dict): Dictionary containing metadata for each sample
+        output_directory (str): Output directory for split GenBank files
         logger: Logger instance for logging messages
         
     Returns:
-        dict: Dictionary with sample names as keys and dicts containing file paths as values,
-              matching the structure returned by annotate_genomes()
-    """
+        dict: Dictionary with sample names as keys and dicts containing:
+            - 'gbk': Path to GenBank file (single) or list of paths (multi-sequence)
+            - 'input_filename': Original input filename (placeholder)
+            - 'is_multi_sequence': Boolean indicating if this is a multi-sequence sample
+            - 'sequence_count': Number of sequences in this sample
+              matching the structure expected by check_genes()
+    """ 
     
     annotated_genomes_dict = {}
     
@@ -3979,10 +3971,10 @@ def load_annotated_genbank_files(genbank_dir, metadata_dict, logger):
         logger.error(f"{"[ERROR]:":10} GenBank directory does not exist: {genbank_dir}")
         utils.exit_program()
     
-    # Create output directory for individual files
-    output_dir = os.path.join(os.path.dirname(genbank_dir), "01_gbk_and_fasta")
+    # Create output directory for individual files written from multi-record GenBank files
+    output_dir = os.path.join(output_directory, "01_gbk_split")
     os.makedirs(output_dir, exist_ok=True)
-    logger.info(f"{"[INFO]:":10} Created output directory: {output_dir}")
+    logger.debug(f"{"[DEBUG]:":10} Created output directory: {output_dir}")
     
     # Get all .gb and .gbk files in the directory
     genbank_files = []
@@ -4010,12 +4002,12 @@ def load_annotated_genbank_files(genbank_dir, metadata_dict, logger):
             
             # Initialize sample in dictionary if not present
             if sample_name not in sample_files:
-                sample_files[sample_name] = {'gbk': [], 'fasta': []}
+                sample_files[sample_name] = {'gbk': [],
+                                             'input_filename': base_filename}
             
             # Parse the GenBank file (may contain multiple records)
             # Parse GenBank file using utility function with warning filtering
             seq_records = utils.parse_genbank_file(gbk_file, logger)
-
 
             if not seq_records:
                 logger.warning(f"{"[WARNING]:":10} No sequences found in {gbk_file}")
@@ -4024,46 +4016,24 @@ def load_annotated_genbank_files(genbank_dir, metadata_dict, logger):
             # If single record, use original file
             if len(seq_records) == 1:
                 sample_files[sample_name]['gbk'].append(gbk_file)
-                
-                # Look for corresponding FASTA file
-                fasta_file = None
-                for ext in ['.fasta', '.fa', '.fas']:
-                    potential_fasta = gbk_file.replace('.gb', ext).replace('.gbk', ext)
-                    if potential_fasta.endswith('.gz'):
-                        potential_fasta = potential_fasta[:-3]  # Remove .gz
-                    if os.path.exists(potential_fasta):
-                        fasta_file = potential_fasta
-                        break
-                
-                if fasta_file:
-                    sample_files[sample_name]['fasta'].append(fasta_file)
-                else:
-                    logger.warning(f"{"[WARNING]:":10} No corresponding FASTA file found for {gbk_file}")
             
             else:
                 # Multiple records - split into individual files
                 logger.info(f"{"[INFO]:":10} Splitting {len(seq_records)} records from {base_filename}")
-                
+
                 for i, record in enumerate(seq_records, 1):
                     # Create individual GenBank file
-                    individual_gbk_name = f"{sample_name}_seq{i:03d}.gb"
+                    # Create a safe sequence name (replace spaces and special chars)
+                    safe_seq_name = str(record.id).replace(' ', '_').replace(':', '_').replace('|', '_')
+                    individual_gbk_name = f"{sample_name}_seq{i:03d}_{safe_seq_name}.gb"
                     individual_gbk_path = os.path.join(output_dir, individual_gbk_name)
                     
                     # Write individual GenBank record
                     SeqIO.write(record, individual_gbk_path, 'genbank')
                     
-                    # Create individual FASTA file
-                    individual_fasta_name = f"{sample_name}_seq{i:03d}.fasta"
-                    individual_fasta_path = os.path.join(output_dir, individual_fasta_name)
-                    
-                    # Write individual FASTA record
-                    SeqIO.write(record, individual_fasta_path, 'fasta')
-                    
                     # Add to sample files
                     sample_files[sample_name]['gbk'].append(individual_gbk_path)
-                    sample_files[sample_name]['fasta'].append(individual_fasta_path)
-                    
-                    logger.debug(f"{"[DEBUG]:":10} Created {individual_gbk_name} and {individual_fasta_name}")
+                    logger.debug(f"{"[DEBUG]:":10} Created {individual_gbk_name}")
                     
         except Exception as e:
             logger.error(f"{"[ERROR]:":10} Error processing GenBank file {gbk_file}: {e}")
@@ -4072,7 +4042,7 @@ def load_annotated_genbank_files(genbank_dir, metadata_dict, logger):
     # Convert to the expected structure
     for sample_name, files in sample_files.items():
         gbk_files = files['gbk']
-        fasta_files = files['fasta']
+        input_filename = files['input_filename']
         
         # Determine if this is a multi-sequence sample
         is_multi_sequence = len(gbk_files) > 1
@@ -4080,44 +4050,24 @@ def load_annotated_genbank_files(genbank_dir, metadata_dict, logger):
         
         # Create the sample data structure matching annotate_genomes() output
         sample_data = {
-            'original_fasta': f"{sample_name}.fasta",  # Placeholder since we don't have original fasta
+            'input_filename': input_filename,  
             'is_multi_sequence': is_multi_sequence,
             'sequence_count': sequence_count
         }
         
-        # Add file paths (convert to single path if only one file, keep as list if multiple)
+        # Add GenBank file paths (convert to single path if only one file, keep as list if multiple)
         if len(gbk_files) == 1:
             sample_data['gbk'] = gbk_files[0]
-            sample_data['fasta'] = fasta_files[0] if fasta_files else None
         else:
             sample_data['gbk'] = gbk_files
-            sample_data['fasta'] = fasta_files if fasta_files else []
         
         annotated_genomes_dict[sample_name] = sample_data
-        logger.info(f"{"[INFO]:":10} Loaded {sequence_count} sequences for {sample_name}")
-    
-    # Validate that all GenBank files have corresponding metadata entries
-    # Normalize metadata sample names by stripping .gz and GenBank extensions
-    def _normalize_name(name: str) -> str:
-        base = name[:-3] if name.endswith('.gz') else name
-        # Remove one extension layer (e.g., .gb or .gbk)
-        root, ext = os.path.splitext(base)
-        if ext.lower() in {'.gb', '.gbk'}:
-            return root
-        return base
+        logger.debug(f"{"[DEBUG]:":10} Loaded {sequence_count} sequences for {sample_name}")
 
-    normalized_metadata_names = { _normalize_name(n) for n in metadata_dict.keys() }
-
-    missing_metadata = []
-    for sample_name in annotated_genomes_dict.keys():
-        if sample_name not in normalized_metadata_names:
-            missing_metadata.append(sample_name)
-    
-    if missing_metadata:
-        logger.error(f"{"[ERROR]:":10} Missing metadata entries for GenBank files: {', '.join(missing_metadata)}")
-        utils.exit_program()
-    
     logger.info(f"{"[INFO]:":10} Successfully loaded {len(annotated_genomes_dict)} samples with annotated GenBank files")
+
+    utils.log_separator(logger)
+    time.sleep(0.1)
     
     return annotated_genomes_dict
 
@@ -4135,8 +4085,8 @@ def check_pipeline(args):
         SystemExit: If input files or directories do not exist.
     """
 
-    print(f'{"[INFO]:":10} Subcommand `check` not implemented yet!')
-    return
+    # print(f'{"[INFO]:":10} Subcommand `check` not implemented yet!')
+    # return
 
     # Track wall-clock runtime for completion message
     start_time = time.time()
@@ -4153,7 +4103,7 @@ def check_pipeline(args):
         utils.print_arguments(args, logger, __version__)
 
         # Check for external dependencies:
-        utils.check_dependencies(logger)
+        utils.check_dependencies(logger, entry='check')
 
         # Load gene median lengths from package resources
         gene_median_lengths = load_gene_median_lengths()
@@ -4165,31 +4115,37 @@ def check_pipeline(args):
         ref_gene_seqrecords = get_references(args, gene_median_lengths, gene_synonyms)
 
         # Parse required metadata TSV file
-        metadata_dict = parse_metadata_tsv(args.metadata_tsv, args.annotated_genbank_dir)
+        if args.metadata_tsv:
+            metadata_dict = parse_metadata_tsv(args.metadata_tsv, args.annotated_genbank_dir, entry='check')
+        else:
+            metadata_dict = None
+            logger.info(f"{"[INFO]:":10} No metadata TSV file provided, default values with be used in EMBL output")
+            utils.log_separator(logger)
+            time.sleep(0.1)
 
         # Load annotated GenBank files
-        annotated_genomes_dict = load_annotated_genbank_files(args.annotated_genbank_dir, metadata_dict, logger)
+        annotated_genomes_dict = load_annotated_genbank_files(args.annotated_genbank_dir, args.output_directory, logger)
 
         # Check genes and write reports
         all_sample_results = check_genes(gene_median_lengths, annotated_genomes_dict, args.min_length_percentage,
                                          args.max_length_percentage, args.report_directory, log_queue, args.pool,
                                          gene_synonyms)
 
-        # # Convert assembly gbk files to embl format
-        # convert_gbk_to_embl(annotated_genomes_dict, args.output_directory, metadata_dict=metadata_dict)
+        # Convert assembly gbk files to embl format
+        convert_gbk_to_embl(annotated_genomes_dict, args.output_directory, metadata_dict=metadata_dict)
 
-        # # Generate alignments if not disabled
-        # if not args.no_alignment:
-        #     align_genes(all_sample_results, ref_gene_seqrecords, args.output_directory, args.pool, args.threads,
-        #                 args.refs_order)
+        # Generate alignments if not disabled
+        if not args.no_alignment:
+            align_genes(all_sample_results, ref_gene_seqrecords, args.output_directory, args.pool, args.threads,
+                        args.refs_order)
 
-        # # Query intergenic regions
-        # if not args.skip_intergenic_analysis:
-        #     query_intergenic_regions(annotated_genomes_dict, args.output_directory, args.min_intergenic_length,
-        #                              args.blast_evalue, args.debug_intergenic, args.max_blast_hits, args.pool,
-        #                              args.threads, log_queue)
-        # else:
-        #     logger.info(f"{"[INFO]:":10} Skipping intergenic region analysis as requested")
+        # Query intergenic regions
+        if not args.skip_intergenic_analysis:
+            query_intergenic_regions(annotated_genomes_dict, args.output_directory, args.min_intergenic_length,
+                                     args.blast_evalue, args.debug_intergenic, args.max_blast_hits, args.pool,
+                                     args.threads, log_queue)
+        else:
+            logger.info(f"{"[INFO]:":10} Skipping intergenic region analysis as requested")
  
     except Exception as e:
         utils.log_manager.handle_error(e, traceback.format_exc(), "check_pipeline()")
@@ -4204,7 +4160,15 @@ def check_pipeline(args):
 
 
 def main(args):
-    """Add sequences to an existing target file.
+    """Main annotation and validation pipeline for plastid genomes.
+    
+    This function orchestrates the complete PAV pipeline including:
+    1. Genome annotation using Chloë
+    2. Gene validation against reference data
+    3. EMBL format conversion
+    4. Multiple sequence alignment generation
+    5. Intergenic region analysis
+    
     Args:
         args (argparse.Namespace): Parsed command line arguments containing input file paths
             and other configuration options.
@@ -4256,7 +4220,7 @@ def main(args):
             args.pool,
             log_queue
         )
-
+        
         # Check genes and write reports
         all_sample_results = check_genes(gene_median_lengths, annotated_genomes_dict, args.min_length_percentage,
                                          args.max_length_percentage, args.report_directory, log_queue, args.pool,
@@ -4288,5 +4252,3 @@ def main(args):
                                   label="PAV subcommand `annotate_and_check` completed")
 
         utils.log_manager.cleanup()
-
-        

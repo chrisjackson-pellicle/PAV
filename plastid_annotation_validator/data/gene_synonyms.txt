@@ -3,7 +3,6 @@
 # Generated from 732 GenBank files and manual curation
 # Organized by functional groups, sorted by RHS values
 # U to T variations handled for tRNA genes
-# locus_tag values excluded
 
 # ================================================================================
 # ACETYL-COA CARBOXYLASE (accD)
@@ -30,7 +29,6 @@ atpE = atpE
 # atpF (ATP synthase CF0 B subunit)
 ATPF = atpF
 atpF = atpF
-
 
 # atpH (ATP synthase CF0 C subunit)
 ATPH = atpH
@@ -115,9 +113,16 @@ psbG = ndhK
 # PHOTOSYSTEM BIOGENESIS FACTORS (paf, pbf genes)
 # ================================================================================
 pafI = pafI
+Ycf3 = pafI
+ycf3 = pafI
+
 pafII = pafII
+Ycf4 = pafII
+ycf4 = pafII
+
 pbf1 = pbf1
-pbfI = pbfI
+# pbfI = pbfI
+psbN = pbf1
 
 # ================================================================================
 # CYTOCHROME b6/f COMPLEX (pet genes)
@@ -156,7 +161,6 @@ psaC = psaC
 
 # psaI (photosystem I subunit VIII/IX)
 psaI = psaI
-psaL = 
 
 # psaJ (photosystem I subunit J)
 psaJ = psaJ
@@ -202,7 +206,7 @@ psbL = psbL
 psbM = psbM
 
 # psbN (photosystem II protein N)
-psbN = psbN
+# psbN = psbN [outdated name]
 
 # psbT (photosystem II protein T)
 psbT = psbT
@@ -688,12 +692,12 @@ Ycf2 = ycf2
 ycf2 = ycf2
 
 # ycf3 (photosystem I assembly protein)
-Ycf3 = pafI
-ycf3 = pafI
+# Ycf3 = pafI
+# ycf3 = pafI
 
 # ycf4 (photosystem I assembly protein)
-Ycf4 = pafII
-ycf4 = pafII
+# Ycf4 = pafII
+# ycf4 = pafII
 
 # ycf5 (hypothetical chloroplast reading frame 5)
 ycf5 = ycf5

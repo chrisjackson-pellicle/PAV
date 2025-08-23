@@ -343,7 +343,7 @@ def print_arguments(args, logger, __version__):
     logger.info('')
 
 
-def check_dependencies(logger):
+def check_dependencies(logger, entry='main'):
     """Checks for the presence of required external executables.
 
     Args:
@@ -353,6 +353,9 @@ def check_dependencies(logger):
         bool: True if all dependencies are found, False otherwise.
     """
     executables = ['mafft', 'trimal', 'blastn', 'julia']
+
+    if entry == 'check':
+        executables = ['mafft', 'trimal', 'blastn']
 
     logger.info(f'{"[INFO]:":10} Checking for external dependencies:\n')
 

@@ -12,7 +12,7 @@ A tool for annotating and validating angiosperm plastid genome annotations, with
 
 ## Overview
 
-PAV is designed to process plastid genome assemblies, perform automated annotation using [Chloë](https://github.com/ian-small/Chloe.jl), validate gene annotations against reference sequences, and generate comprehensive reports. The tool includes features for genome linearization, reference-based alignment, detailed quality assessment, and EMBL/ENA template generation. PAV supports both single and multi-sequence FASTA files, automatically detecting and processing each sequence individually.
+PAV is designed to process plastid genome assemblies, perform automated annotation using [Chloë](https://github.com/ian-small/Chloe.jl), validate gene annotations against reference sequences, and generate comprehensive reports. The tool includes features for genome linearization, reference-based alignment, detailed quality assessment, and EMBL/ENA template generation. PAV supports both single and multi-sequence FASTA files per sample, with the latter allowing for fragmented assemblies.
 
 ## Features
 
@@ -31,11 +31,11 @@ PAV is designed to process plastid genome assemblies, perform automated annotati
 ### Prerequisites
 
 - Python 3.7+
-- [Chloë](https://github.com/ian-small/Chloe.jl) annotation tool
+- [Chloë](https://github.com/ian-small/Chloe.jl) (annotation tool - not required for `pav check` command)
+- [Julia](https://julialang.org/downloads/) (for running Chloë - not required for `pav check` command)
 - [MAFFT](https://mafft.cbrc.jp/alignment/software/source.html) (for alignments)
 - [TrimAl](https://vicfero.github.io/trimal/index.html) (for backtranslation)
 - [BLAST+](https://www.ncbi.nlm.nih.gov/books/NBK569861/) (for querying intergenic regions)
-- [Julia](https://julialang.org/downloads/) (for running Chloë)
 
 ### Setup
 
@@ -54,7 +54,7 @@ PAV is designed to process plastid genome assemblies, perform automated annotati
 3. **Install Chloë** (if not already installed):
    ```bash
    # Follow Chloë installation instructions
-   # If using a conda environment, ensure chloe and chloe references are in `${CONDA_PREFIX}/bin` or supply the chloe project dir and path to chloe.jl to the `pav` subcommand
+   # If using a conda environment, ensure chloe and chloe references are in `${CONDA_PREFIX}/bin` or supply the chloe project dir and path to chloe.jl to the `pav annotate_and_check` subcommand
    ```
 
 4. **Install external tools**:
@@ -73,6 +73,7 @@ PAV is designed to process plastid genome assemblies, perform automated annotati
 
 ### Basic Usage
 
+#### Full annotation and validation pipeline:
 ```bash
 pav annotate_and_check \
   /path/to/fasta/files \
@@ -80,7 +81,16 @@ pav annotate_and_check \
   --output_directory /path/to/output
 ```
 
+#### Continue pipeline from annotated GenBank files:
+```bash
+pav check \
+  /path/to/annotated/genbank/files \
+  --output_directory /path/to/output
+```
+
 ### Command Line Options
+
+#### `pav annotate_and_check` - Full annotation and validation pipeline
 
 ```
 usage: pav annotate_and_check [-h] [--min_length_percentage FLOAT]
@@ -103,13 +113,43 @@ options:
 Required input:
   DIR                   Directory containing plastid DNA FASTA files.
   TSV                   TSV file containing sample metadata for EMBL
-                        conversion. Required file should contain columns:
-                        fasta_filename, project_id, locus_tag, genus_species,
-                        linear_or_circular. ALL samples must be listed. Only
-                        fasta_filename and linear_or_circular require values;
-                        empty optional fields will use defaults.
+                        conversion. File should contain columns:
+                        input_filename, project_id, locus_tag, genus_species,
+                        linear_or_circular. Only input_filename and linear_or_circular 
+                        require values; empty optional fields will use defaults.
                         linear_or_circular must be "linear" or "circular".
+```
 
+#### `pav check` - Continue pipeline from annotated GenBank files
+
+```
+usage: pav check [-h] [--min_length_percentage FLOAT]
+                 [--max_length_percentage FLOAT] [--no_alignment]
+                 [--refs_order ORDER [ORDER ...]]
+                 [--custom_refs_folder DIR]
+                 [--min_intergenic_length INTEGER]
+                 [--blast_evalue FLOAT]
+                 [--skip_intergenic_analysis]
+                 [--debug_intergenic] [--max_blast_hits INTEGER]
+                 [--output_directory DIR] [--pool INTEGER]
+                 [--threads INTEGER] [--metadata_tsv TSV]
+                 [--run_profiler]
+                 DIR
+
+options:
+  -h, --help            show this help message and exit
+
+Required input:
+  DIR                   Directory containing annotated GenBank files (.gb, .gbk, .gb.gz, .gbk.gz).
+
+Optional input:
+  --metadata_tsv TSV    TSV file containing sample metadata for EMBL conversion.
+                        If not provided, samples will be processed without metadata.
+```
+
+#### Options common to both `pav annotate_and_check` and `pav check`
+
+```
 Gene length warnings:
   --min_length_percentage FLOAT, -min_len FLOAT
                         Minimum length percentage of the gene median length
@@ -178,6 +218,19 @@ pav annotate_and_check \
   metadata.tsv
 ```
 
+#### Continue from annotated GenBank files:
+```bash
+pav check \
+  annotated_genomes/
+```
+
+#### Continue from annotated GenBank files with metadata:
+```bash
+pav check \
+  annotated_genomes/ \
+  --metadata_tsv metadata.tsv
+```
+
 #### Multiple reference orders:
 ```bash
 pav annotate_and_check \
@@ -236,6 +289,7 @@ pav annotate_and_check \
 
 The tool generates a structured output directory:
 
+### For `pav annotate_and_check`:
 ```
 output_dir/
 ├── 00_logs_and_reports/
@@ -257,7 +311,8 @@ output_dir/
 │       └── <prefix>_seq001_<seqname>.round1.chloe.gff  # Individual sequence GFF files
 ├── 02_embl_files/
 │   ├── <sample_name>.embl                        # EMBL format
-│   └── <sample_name>.ena.embl                    # ENA template (derived from EMBL)
+│   └── ena_submission_embl_files/
+│       └── <sample_name>.ena.embl                # ENA template (derived from EMBL)
 ├── 03_alignments_with_refs/
 │   ├── 01_per_sample_alignments/
 │   │   └── <sample_name>/
@@ -269,67 +324,144 @@ output_dir/
 ├── 04_intergenic_analysis/
     ├── <sample_name>_intergenic_blast_results.tsv       # Per-sample BLAST results
     └── combined_intergenic_blast_results.tsv            # Combined BLAST results
+```
 
+### For `pav check`:
+```
+output_dir/
+├── 00_logs_and_reports/
+│   ├── logs/
+│   │   └── check_<timestamp>.log                         # Runtime log
+│   └── reports/
+│       ├── all_samples_gene_validation_report.tsv       # Combined gene length/translation checks
+│       └── <sample_name>_gene_validation_report.tsv     # Per-sample reports
+├── 01_gbk_split/                                        # Split multi-record GenBank files
+│   └── <sample_name>_seq001_<seqname>.gb                # Individual sequence files from multi-record GenBank files
+├── 02_embl_files/
+│   ├── <sample_name>.embl                               # EMBL format
+│   └── ena_submission_embl_files/
+│       └── <sample_name>.ena.embl                       # ENA template (derived from EMBL)
+├── 03_alignments_with_refs/
+│   ├── 01_per_sample_alignments/
+│   │   └── <sample_name>/
+│   │       ├── <sample>_<gene>_alignment.fasta          # Per-sample CDS alignment
+│   │       ├── <sample>_<gene>_rRNA_alignment.fasta     # Per-sample rRNA alignment
+│   │       └── <sample>_<gene>_tRNA_alignment.fasta     # Per-sample tRNA alignment
+│   └── 02_per_gene_alignments/
+│       └── <gene>_all_samples_alignment.fasta           # All samples combined (nucleotide)
+├── 04_intergenic_analysis/
+    ├── <sample_name>_intergenic_blast_results.tsv       # Per-sample BLAST results
+    └── combined_intergenic_blast_results.tsv            # Combined BLAST results
 ```
 
 ## Workflow
 
-### 1. Genome Annotation
+### `pav annotate_and_check` - Full Pipeline
+
+#### 1. Genome Annotation
 - Processes input FASTA files using Chloë
-- **Supports both single and multi-sequence FASTA files**
+- **Supports both single and multi-sequence FASTA files per sample**
 - For multi-sequence FASTA files, each sequence is processed separately with Chloë
 - Performs initial annotation on original sequences
-- Linearizes genomes upstream of a specified gene (default: psbA), unless sample is recorded as `linear` in metadata
+- Linearizes genomes upstream of a specified gene (default: psbA), unless sample is recorded as `linear` in metadata. If the gene is not found in the sequence, no linearisation occurs
 - Re-annotates linearized sequences
 
-### 2. Reference Validation
+#### 2. Reference Validation
 - Loads reference sequences from multiple sources (CDS, rRNA, and tRNA)
 - Validates gene annotations against reference data
 - Checks for gene length outliers, internal stop codons, and non-canonical start and stop codons
 - Generates detailed reports
 
-### 3. Alignment Generation
+#### 3. Alignment Generation
 - Creates nucleotide alignments with reference sequences for rRNA and tRNA genes
 - Generates codon-aware nucleotide alignments for CDS genes
 
-### 4. EMBL and ENA Template Generation
+#### 4. EMBL and ENA Template Generation
 - Adds locus tags and standardizes features for EMBL
 - Builds EMBL templates using metadata TSV (see below), ready for submission to ENA
 
-### 5. Intergenic Region Analysis
+#### 5. Intergenic Region Analysis
 - Extracts intergenic regions from annotated genomes
-- Performs BLAST analysis against reference databases
+- Performs BLAST analysis against a reference database of coding regions
+- Identifies potential functional intergenic regions
 - Generates comprehensive reports of intergenic region characteristics
+
+### `pav check` - Continue from Annotated GenBank Files
+
+#### 1. Load Annotated GenBank Files
+- Processes existing annotated GenBank files (.gb, .gbk, .gb.gz, .gbk.gz)
+- Automatically splits multi-record GenBank files into individual sequence files
+- Supports both single and multi-record files per sample
+
+#### 2. Reference Validation
+- Same validation process as the full pipeline
+- Validates gene annotations against reference data
+- Checks for gene length outliers, internal stop codons, and non-canonical start and stop codons
+
+#### 3. Alignment Generation
+- Same alignment process as the full pipeline
+- Creates nucleotide alignments with reference sequences
+
+#### 4. EMBL and ENA Template Generation
+- Same EMBL conversion process as the full pipeline
+- Requires metadata TSV file if provided via `--metadata_tsv`
+
+#### 5. Intergenic Region Analysis
+- Same intergenic analysis as the full pipeline
+- Extracts and analyzes intergenic regions
+
+## Gene naming conventions
+
+PAV follows the gene naming conventions used by Chloë, e.g.
+
+- pafI rather than ycf3
+- pbf1 rather than psbN
+- ndhK rather than psbG
+- etc.
+
+This means that if you run `pav check` on a genomes with the annotation `ycf3`, the corresponding alignment produced by PAV will be named e.g. `pafI_all_samples_alignment.fasta`.
+
+See the full list of synonyms [here](https://github.com/chrisjackson-pellicle/PAV/blob/main/plastid_annotation_validator/data/gene_synonyms.txt).
 
 ## Metadata TSV Format
 
-Provide a tab-separated file with the following required columns (include this header in the file):
+Provide a tab-separated file with the following columns (include this header in the file):
 
-- `fasta_filename`
-- `project_id`
-- `locus_tag`
-- `genus_species`
-- `linear_or_circular` (must be either `linear` or `circular`)
+- `input_filename` (required)
+- `project_id` (optional)
+- `locus_tag` (optional)
+- `genus_species` (optional)
+- `linear_or_circular` (required, must be either `linear` or `circular`)
 
-Example (`metadata.tsv`):
+Example [`metadata.tsv`](https://github.com/chrisjackson-pellicle/PAV/blob/main/plastid_annotation_validator/data/metadata.tsv):
 
-| fasta_filename | project_id | locus_tag | genus_species | linear_or_circular |
+| input_filename | project_id | locus_tag | genus_species | linear_or_circular |
 |----------------|------------|-----------|---------------|--------------------|
 | sample1.fasta  | PRJEB12345 | ABC       | Arabidopsis thaliana | circular |
 | sample2.fasta  | PRJEB98765 | XYZ       | Oryza sativa | linear |
 | sample3.fasta  |            |           |               | circular |
+| sample4.fasta  | PRJEB11111 |           | Zea mays | circular |
 
 
 Notes:
-- All columns above must be present in the header, but only `fasta_filename` and `linear_or_circular` require values
-- Empty optional fields will use these default values:
+- **Required fields**: `input_filename` and `linear_or_circular` must have values when running `pav annotate_and_check`
+- **Optional fields**: `project_id`, `locus_tag`, and `genus_species` can be empty
+- **Default values** for empty optional fields:
   - `project_id` → `'UNKNOWN_PROJECT'`
   - `locus_tag` → `'DEFAULT_TAG'`
   - `genus_species` → `'Unknown species'`
+  - `linear_or_circular` → `'unknown'` (only allowed when running `pav check`)
+- **File format**: The metadata file must be a tab-separated file with the above columns
+- **File path**: The path to the metadata file is a required positional argument for `pav annotate_and_check`, but an optional parameter passed via `--metadata_tsv` for `pav check`
 - The topology is used in the ENA `ID` line and must match one of: `linear`, `circular`
-- **ALL samples must be present in the metadata file** - PAV will fail if any samples are missing
+- **For `pav annotate_and_check`**: All samples must be present in the metadata file
+- **For `pav check`**: Metadata is optional - if not provided, samples will be processed without metadata
 - Samples marked as `linear` will **not be re-linearized** at the `--linearize_gene` position, preserving their original linear structure
 
+## Intergenic region reports
+
+Note that the database of coding regions used in the intergenic analyses is derived the genomes in the [`/data/order_genomes`](https://github.com/chrisjackson-pellicle/PAV/tree/main/plastid_annotation_validator/data/order_genomes) folder. These genomes can have mis-annotations, leading to **spurious detection of genes in the intergenic regions of your genomes**. For example, if an `rrn23` annotation in the reference database has a 5' termini that was incorrectly extended in to upstream intergenic sequence (e.g. `NC_036304`), `rrn23` may be reported in the homologous intergenic region of your genome. This is a limitation of the reference database, and will be improved in future releases.   
+ 
 ## Gene Types Supported
 
 PAV processes and validates three main types of plastid genes:
@@ -346,11 +478,12 @@ Reference sequences are named using the format: `{Order}_{Family}_{Genus}_{Speci
 ## File Formats
 
 ### Input
-- **FASTA**: Genome assemblies (.fasta, .fa, .fas)
+- **FASTA**: Genome assemblies (.fasta, .fa, .fas) - for `pav annotate_and_check`
+- **GenBank**: Annotated genomes (.gb, .gbk, .gb.gz, .gbk.gz) - for `pav check`
 
 ### Output
-- **GenBank**: Annotated genomes in GenBank format
-- **GFF**: Gene feature format files
+- **GenBank**: Annotated genomes in GenBank format (from Chloë)
+- **GFF**: Gene feature format files (from Chloë)
 - **EMBL**: European Molecular Biology Laboratory format
 - **FASTA**: Aligned sequences and linearized genomes
 
@@ -359,8 +492,8 @@ Reference sequences are named using the format: `{Order}_{Family}_{Genus}_{Speci
 PAV supports multiple sources of reference genomes:
 
 ### Built-in References
-- **Order-specific references**: Located in `data/order_genomes/` directory, organized by taxonomic order
-- **Default references**: Located in `data/reference_genomes_default/` directory
+- **Order-specific references**: Located in [`data/order_genomes`](https://github.com/chrisjackson-pellicle/PAV/tree/main/plastid_annotation_validator/data/order_genomes) directory, organized by taxonomic order
+- **Default references**: Located in [`data/reference_genomes_default`](https://github.com/chrisjackson-pellicle/PAV/tree/main/plastid_annotation_validator/data/reference_genomes_default) directory
 
 ### Custom References
 - **Custom reference folder**: Users can provide their own folder of reference GenBank files using `--custom_refs_folder`
@@ -387,12 +520,12 @@ The following taxonomic orders are available in the built-in reference database:
 - Piperales, Poales, Proteales, Ranunculales, Rosales, Santalales, Sapindales
 - Saxifragales, Solanales, Trochodendrales, Vitales, Zingiberales, Zygophyllales
 
-See `data/order_genomes/` for the complete list and available reference genomes.
+See [`data/order_genomes`](https://github.com/chrisjackson-pellicle/PAV/tree/main/plastid_annotation_validator/data/order_genomes) for the complete list and available reference genomes.
 
 ## Configuration
 
 ### Median Lengths
-Reference gene lengths are stored in `data/plDNA_genes_median_lengths.csv` for validation.
+Reference gene lengths are stored in [`data/plDNA_genes_median_lengths.csv`](https://github.com/chrisjackson-pellicle/PAV/blob/main/plastid_annotation_validator/data/plDNA_genes_median_lengths.csv) for validation.
 
 ## Troubleshooting
 
@@ -401,15 +534,17 @@ Reference gene lengths are stored in `data/plDNA_genes_median_lengths.csv` for v
 1. **Chloë not found**: Ensure Chloë is properly installed and accessible
 2. **MAFFT/TrimAl errors**: Check that external tools are installed and in PATH
 3. **BLAST+ not found**: Install BLAST+ (`blastn`, `makeblastdb`) and ensure they are in your $PATH
-4. **Metadata TSV columns**: Ensure the TSV has exactly the required columns listed above
+4. **Metadata TSV columns**: Ensure the TSV has the required columns listed above
 5. **Memory issues**: Reduce `--pool` and `--threads` parameters
 6. **Custom reference folder not found**: Verify the path to your custom reference folder exists and contains GenBank files
 7. **Linearization gene not found**: If the specified linearization gene is not found in a genome, the original sequence will be used without linearization
+8. **Missing metadata values**: Rows with missing required fields will be skipped with warnings
+9. **Gzipped GenBank files**: PAV supports both compressed (.gz) and uncompressed GenBank files for the `check` subcommand
 
 ## Support
 
 For issues and questions:
-- Check the troubleshooting section
+- Check the Troubleshooting section
 - Review the documentation
 - Open an issue on GitHub
 
