@@ -344,7 +344,8 @@ def check_gene_translation(gene_name, cds_info_list, logger):
             start_codon = str(cds_seqrecord.seq[:3])
 
             if start_codon != "ATG":
-                warnings.append(f"Start codon is {start_codon}, expected ATG for copy {i+1}")
+                # warnings.append(f"Start codon is {start_codon}, expected ATG for copy {i+1}")
+                warnings.append(f"Start codon is {start_codon}, expected ATG")
             
             # Check for stop codon at the end
             stop_codon = str(cds_seqrecord.seq[-3:])
@@ -880,8 +881,8 @@ def write_gene_length_report(all_results, logger, min_threshold, max_threshold, 
         with open(sample_report_file, 'w') as f:
             f.write('\n'.join(sample_tsv_lines))
         
-        logger.info(f"{"":10} Sample {sample_name}: {total_genes_count} genes (including multi-copy), "
-                    f"{warnings_found} warnings, {missing_genes_count} missing genes from 113-gene reference set")
+        logger.info(f"{"":10} {sample_name:20}: {total_genes_count} genes (including multi-copy), "
+                    f"{warnings_found} warnings, {missing_genes_count} missing genes (from 113-gene reference set)")
     
     logger.info(f"")
     
