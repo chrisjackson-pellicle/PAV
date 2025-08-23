@@ -120,6 +120,17 @@ Required input:
                         linear_or_circular. Only input_filename and linear_or_circular 
                         require values; empty optional fields will use defaults.
                         linear_or_circular must be "linear" or "circular".
+
+Optional input:
+  --chloe_project_dir DIR, -chloe_proj DIR
+                        Path to the chloe project directory to use as
+                        --project for Julia. Must be provided together with
+                        --chloe_script.
+  --chloe_script PATH, -chloe_jl PATH
+                        Path to the chloe.jl script. Must be provided together
+                        with --chloe_project_dir.
+  --linearise_gene GENE_NAME, -linearise_gene GENE_NAME
+                        Gene to use for genome linearisation. Default is: psbA
 ```
 
 #### `pav check` - Continue pipeline from annotated GenBank files
@@ -198,15 +209,6 @@ General pipeline options:
   --threads INTEGER, -t INTEGER
                         The number of threads to use for the subcommand.
                         Default is: 1
-  --chloe_project_dir DIR, -chloe_proj DIR
-                        Path to the chloe project directory to use as
-                        --project for Julia. Must be provided together with
-                        --chloe_script.
-  --chloe_script PATH, -chloe_jl PATH
-                        Path to the chloe.jl script. Must be provided together
-                        with --chloe_project_dir.
-  --linearise_gene GENE_NAME, -linearise_gene GENE_NAME
-                        Gene to use for genome linearisation. Default is: psbA
   --run_profiler        If supplied, run the subcommand using cProfile. Saves
                         a *.csv file of results. Default is: False
 ```
@@ -460,7 +462,7 @@ Notes:
 - **For `pav check`**: Metadata is optional - if not provided, samples will be processed without metadata
 - Samples marked as `linear` will **not be re-linearized** at the `--linearize_gene` position, preserving their original linear structure
 
-## Intergenic region reports
+## Intergenic regions reports
 
 Note that the database of coding regions used in the intergenic analyses is derived the genomes in the [`/data/order_genomes`](https://github.com/chrisjackson-pellicle/PAV/tree/main/plastid_annotation_validator/data/order_genomes) folder. These genomes can have mis-annotations, leading to **spurious detection of genes in the intergenic regions of your genomes**. For example, if an `rrn23` annotation in the reference database has a 5' termini that was incorrectly extended in to upstream intergenic sequence (e.g. `NC_036304`), `rrn23` may be reported in the homologous intergenic region of your genome. This is a limitation of the reference database, and will be improved in future releases. 
 
