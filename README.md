@@ -17,7 +17,7 @@ PAV is designed to process plastid genome assemblies, perform automated annotati
 ## Features
 
 - **Automated Annotation**: Uses Chloë for plastid genome annotation
-- **Genome Linearisation**: Automatically linearises genomes upstream of a specified gene (defaults to `psbA`) unless genome is specified as `linear`
+- **Genome Linearisation**: Automatically linearises genomes upstream of a specified gene (defaults to `psbA`) unless genome is specified as 'linear' or the gene is not found
 - **Reference-Based Validation**: Compares annotations against reference genomes from multiple sources (order-specific, default, or custom)
 - **Quality Assessment**: Validates gene lengths, identifies internal stop codons, and checks for canonical start and stop codons
 - **Alignment Generation**: Creates nucleotide alignments with reference sequences for CDS, rRNA, and tRNA genes
@@ -360,7 +360,7 @@ output_dir/
 
 #### 1. Genome Annotation
 - Processes input FASTA files using Chloë
-- **Supports both single and multi-sequence FASTA files per sample**
+- Supports both single and multi-sequence FASTA files per sample
 - For multi-sequence FASTA files, each sequence is processed separately with Chloë
 - Performs initial annotation on original sequences
 - Linearizes genomes upstream of a specified gene (default: psbA), unless sample is recorded as `linear` in metadata. If the gene is not found in the sequence, no linearisation occurs
@@ -414,9 +414,9 @@ output_dir/
 
 PAV follows the gene naming conventions used by Chloë, e.g.
 
-- pafI rather than ycf3
-- pbf1 rather than psbN
-- ndhK rather than psbG
+- `pafI` rather than `ycf3`
+- `pbf1` rather than `psbN`
+- `ndhK` rather than `psbG`
 - etc.
 
 This means that if you run `pav check` on a genomes with the annotation `ycf3`, the corresponding alignment produced by PAV will be named e.g. `pafI_all_samples_alignment.fasta`.
@@ -497,14 +497,14 @@ PAV supports multiple sources of reference genomes:
 
 ### Custom References
 - **Custom reference folder**: Users can provide their own folder of reference GenBank files using `--custom_refs_folder`
-- Supports both compressed (.gz) and uncompressed GenBank files
+- Supports both compressed (`.gz`) and uncompressed GenBank files
 - Can be used alone or in combination with built-in references
 
 ### Reference Combination
 PAV can combine reference sequences from multiple sources:
 - Order-specific references (via `--refs_order`)
-- Default references (when no specific references are specified)
 - Custom references (via `--custom_refs_folder`)
+- Default references (when no specific references are specified)
 
 All reference sources are merged to provide comprehensive validation and alignment data.
 
@@ -532,14 +532,13 @@ Reference gene lengths are stored in [`data/plDNA_genes_median_lengths.csv`](htt
 ### Common Issues
 
 1. **Chloë not found**: Ensure Chloë is properly installed and accessible
-2. **MAFFT/TrimAl errors**: Check that external tools are installed and in PATH
+2. **MAFFT/TrimAl errors**: Check that external tools are installed and in your $PATH
 3. **BLAST+ not found**: Install BLAST+ (`blastn`, `makeblastdb`) and ensure they are in your $PATH
 4. **Metadata TSV columns**: Ensure the TSV has the required columns listed above
 5. **Memory issues**: Reduce `--pool` and `--threads` parameters
 6. **Custom reference folder not found**: Verify the path to your custom reference folder exists and contains GenBank files
 7. **Linearization gene not found**: If the specified linearization gene is not found in a genome, the original sequence will be used without linearization
-8. **Missing metadata values**: Rows with missing required fields will be skipped with warnings
-9. **Gzipped GenBank files**: PAV supports both compressed (.gz) and uncompressed GenBank files for the `check` subcommand
+8. **Gzipped GenBank files**: PAV supports both compressed (.gz) and uncompressed GenBank files as input for the `check` subcommand
 
 ## Support
 
