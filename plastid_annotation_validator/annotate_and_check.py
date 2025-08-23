@@ -90,7 +90,8 @@ def load_gene_synonyms():
                 genbank_name, standard_name = line.split(' = ', 1)
                 gene_synonyms[genbank_name.strip()] = standard_name.strip()
 
-    logger.debug(f"{"[DEBUG]:":10} Successfully loaded {len(gene_synonyms)} gene synonyms from package resources")
+    if logger:
+        logger.debug(f"{"[DEBUG]:":10} Successfully loaded {len(gene_synonyms)} gene synonyms from package resources")
     return gene_synonyms
         
 
@@ -110,13 +111,15 @@ def load_gene_median_lengths():
                                        'plDNA_genes_median_lengths.csv') as csv_file:
         gene_lengths_df = pd.read_csv(csv_file)
 
-    logger.debug(f"{"[DEBUG]:":10} Successfully loaded reference gene median lengths from package resources")
-    logger.debug(f"{"[DEBUG]:":10} Loaded {len(gene_lengths_df)} gene entries")
+    if logger:
+        logger.debug(f"{"[DEBUG]:":10} Successfully loaded reference gene median lengths from package resources")
+        logger.debug(f"{"[DEBUG]:":10} Loaded {len(gene_lengths_df)} gene entries")
     
     # Convert to dictionary for easier access
     gene_median_lengths = dict(zip(gene_lengths_df['Key'], gene_lengths_df['Value']))
     
-    logger.debug(f"{"[DEBUG]:":10} Loaded {len(gene_median_lengths)} gene median lengths")
+    if logger:
+        logger.debug(f"{"[DEBUG]:":10} Loaded {len(gene_median_lengths)} gene median lengths")
     
     return gene_median_lengths
 
@@ -877,7 +880,7 @@ def write_gene_length_report(all_results, logger, min_threshold, max_threshold, 
         with open(sample_report_file, 'w') as f:
             f.write('\n'.join(sample_tsv_lines))
         
-        logger.info(f"{"[INFO]:":10} Sample {sample_name}: {total_genes_count} genes (including multi-copy), "
+        logger.info(f"{"":10} Sample {sample_name}: {total_genes_count} genes (including multi-copy), "
                     f"{warnings_found} warnings, {missing_genes_count} missing genes from 113-gene reference set")
     
     logger.info(f"")
@@ -2288,7 +2291,51 @@ def split_multi_sequence_fasta(fasta_file, output_dir, filename_prefix, logger=N
         return []
 
 
-def linearise_genome_upstream_gene(gbk_file, fasta_file, output_dir, sample_name, linearise_gene='psbA', logger=None):
+def validate_linearization_genes(linearise_genes, gene_synonyms, logger=None):
+    """
+    Validate that linearization genes are present in the gene_synonyms.txt file.
+    
+    Args:
+        linearise_genes (list): List of gene names to validate
+        gene_synonyms (dict): Dictionary mapping gene names to standardized synonyms
+        logger: Logger instance for logging messages
+        
+    Returns:
+        list: List of validated gene names (RHS values from gene_synonyms.txt)
+        
+    Raises:
+        ValueError: If any gene is not found in gene_synonyms.txt
+    """
+    validated_genes = []
+    gene_synonyms_rhs_values = set(gene_synonyms.values())
+
+    failed_genes = []
+    
+    for gene in linearise_genes:
+        gene = gene.strip()
+        if gene in gene_synonyms_rhs_values:
+            validated_genes.append(gene)
+        else:
+            # Check if it's a LHS value that maps to a RHS value
+            if gene in gene_synonyms:
+                mapped_gene = gene_synonyms[gene]
+                validated_genes.append(mapped_gene)
+                if logger:
+                    logger.debug(f"{"[DEBUG]:":10} Mapped linearization gene: {gene} -> {mapped_gene}")
+            else:
+                failed_genes.append(gene)
+             
+    if failed_genes:
+        logger.error(f"{"[ERROR]:":10} Failed to find the following linearization genes in gene_synonyms.txt: {', '.join(failed_genes)}")
+        utils.exit_program()
+    
+    logger.info(f"{"[INFO]:":10} Using linearization genes: {', '.join(validated_genes)}")
+    utils.log_separator(logger)
+    
+    return validated_genes
+
+
+def linearise_genome_upstream_gene(gbk_file, fasta_file, output_dir, sample_name, linearise_genes=['psbA'], logger=None):
     """
     Linearise genome upstream of specified gene and write new fasta file.
     
@@ -2297,7 +2344,7 @@ def linearise_genome_upstream_gene(gbk_file, fasta_file, output_dir, sample_name
         fasta_file (str): Path to original fasta file
         output_dir (str): Output directory for linearised fasta
         sample_name (str): Sample name for output file
-        linearise_gene (str): Gene name to use for linearisation (default: 'psbA')
+        linearise_genes (list): List of gene names to try for linearisation (default: ['psbA'])
         logger: Logger instance for logging messages
 
     Returns:
@@ -2308,16 +2355,23 @@ def linearise_genome_upstream_gene(gbk_file, fasta_file, output_dir, sample_name
         records = utils.parse_genbank_file(gbk_file, logger)
         record = records[0]
         
-        # Find the specified gene
+        # Try each gene in the list until one is found
         gene_start = None
-        for feature in record.features:
-            if feature.type == 'CDS' and 'gene' in feature.qualifiers:
-                if feature.qualifiers['gene'][0] == linearise_gene:
-                    gene_start = feature.location.start
-                    break
+        found_gene = None
+        
+        for linearise_gene in linearise_genes:
+            for feature in record.features:
+                if feature.type == 'CDS' and 'gene' in feature.qualifiers:
+                    if feature.qualifiers['gene'][0] == linearise_gene:
+                        gene_start = feature.location.start
+                        found_gene = linearise_gene
+                        break
+            if gene_start is not None:
+                break
         
         if gene_start is None:
-            logger.debug(f"{"[DEBUG]:":10} {linearise_gene} gene not found in {sample_name}, using original sequence")
+            gene_list_str = ', '.join(linearise_genes)
+            logger.debug(f"{"[DEBUG]:":10} None of the linearization genes [{gene_list_str}] found in {sample_name} record {record.id}, using original sequence instead")
             return fasta_file
         
         # Read original fasta sequence
@@ -2332,7 +2386,7 @@ def linearise_genome_upstream_gene(gbk_file, fasta_file, output_dir, sample_name
         linearised_record = SeqRecord(
             seq=linearised_sequence,
             id=fasta_record.id,
-            description=f"Linearised upstream of {linearise_gene} (original position: {gene_start})"
+            description=f"Linearised upstream of {found_gene} (original position: {gene_start})"
         )
         
         # Write linearised fasta file
@@ -2340,7 +2394,7 @@ def linearise_genome_upstream_gene(gbk_file, fasta_file, output_dir, sample_name
         with open(linearised_fasta, 'w') as handle:
             SeqIO.write(linearised_record, handle, 'fasta')
         
-        logger.debug(f"{"[INFO]:":10} Linearised {sample_name} upstream of {linearise_gene} (position {gene_start})")
+        logger.debug(f"{"[INFO]:":10} Linearised {sample_name} upstream of {found_gene} (position {gene_start})")
         return linearised_fasta
         
     except Exception as e:
@@ -2348,7 +2402,7 @@ def linearise_genome_upstream_gene(gbk_file, fasta_file, output_dir, sample_name
         return fasta_file
 
 
-def process_single_sequence(fasta_file, output_dir, sequence_name, chloe_project_dir, chloe_script_path, linearise_gene, 
+def process_single_sequence(fasta_file, output_dir, sequence_name, chloe_project_dir, chloe_script_path, linearise_genes, 
                             metadata_dict, original_fasta_name, logger=None):
     """
     Process a single sequence file with Chloë annotation.
@@ -2359,7 +2413,7 @@ def process_single_sequence(fasta_file, output_dir, sequence_name, chloe_project
         sequence_name (str): Name for this sequence
         chloe_project_dir (str): Chloë project directory
         chloe_script_path (str): Chloë script path
-        linearise_gene (str): Gene to use for linearisation
+        linearise_genes (list): List of genes to try for linearisation
         metadata_dict (dict): Metadata dictionary
         original_fasta_name (str): Original multi-sequence filename for metadata lookup
         logger: Logger instance for logging messages
@@ -2465,7 +2519,8 @@ def process_single_sequence(fasta_file, output_dir, sequence_name, chloe_project
 
     # Linearise and re-annotate (if we have original annotation but no linearised and sample should be linearised)
     if has_original_annotation and not has_linearised_annotation_and_fasta and should_linearise:
-        logger.debug(f"{"[INFO]:":10} Linearising {sequence_name} upstream of {linearise_gene}...")
+        gene_list_str = ', '.join(linearise_genes)
+        logger.debug(f"{"[INFO]:":10} Linearising {sequence_name} upstream of genes: {gene_list_str}...")
         
         # Linearise the genome upstream of the specified gene
         output_fasta_linearised = linearise_genome_upstream_gene(
@@ -2473,7 +2528,7 @@ def process_single_sequence(fasta_file, output_dir, sequence_name, chloe_project
             fasta_file, 
             output_dir, 
             sequence_name,
-            linearise_gene,
+            linearise_genes,
             logger
         )
 
@@ -2514,7 +2569,7 @@ def process_single_sequence(fasta_file, output_dir, sequence_name, chloe_project
 
 
 def annotate_genomes(genome_fasta_dir, output_directory, chloe_project_dir=None, chloe_script_path=None,
-                     linearise_gene='psbA',  metadata_dict=None, pool_size=1, log_queue=None):
+                     linearise_genes=['psbA'],  metadata_dict=None, pool_size=1, log_queue=None):
     """
     Annotate genome fasta files using chloe annotate command.
     
@@ -2523,7 +2578,7 @@ def annotate_genomes(genome_fasta_dir, output_directory, chloe_project_dir=None,
         output_directory (str): Path to directory to write annotated genomes
         chloe_project_dir (str, optional): Path to the chloe project directory
         chloe_script_path (str, optional): Path to the chloe.jl script
-        linearise_gene (str, optional): Gene to use for linearisation (default: 'psbA')
+        linearise_genes (list, optional): List of genes to try for linearisation (default: ['psbA'])
         metadata_dict (dict, optional): Metadata dictionary mapping fasta filenames to metadata.
                                       Used to check linear_or_circular status to skip linearisation
                                       for samples already marked as linear.
@@ -2571,7 +2626,7 @@ def annotate_genomes(genome_fasta_dir, output_directory, chloe_project_dir=None,
         # Submit all tasks
         future_to_file = {
             executor.submit(process_single_fasta_file, fasta_file, annotated_genomes_dir, chloe_project_dir,
-                            chloe_script_path, linearise_gene, metadata_dict, log_queue): fasta_file
+                            chloe_script_path, linearise_genes, metadata_dict, log_queue): fasta_file
             for fasta_file in fasta_files
         }
         
@@ -2595,7 +2650,7 @@ def annotate_genomes(genome_fasta_dir, output_directory, chloe_project_dir=None,
     return annotated_genomes
 
 
-def process_single_fasta_file(fasta_file, annotated_genomes_dir, chloe_project_dir, chloe_script_path, linearise_gene,
+def process_single_fasta_file(fasta_file, annotated_genomes_dir, chloe_project_dir, chloe_script_path, linearise_genes,
                               metadata_dict, log_queue=None):
     """
     Process a single FASTA file with annotation (worker function for multiprocessing).
@@ -2605,7 +2660,7 @@ def process_single_fasta_file(fasta_file, annotated_genomes_dir, chloe_project_d
         annotated_genomes_dir (str): Directory for annotated genomes
         chloe_project_dir (str): Chloë project directory
         chloe_script_path (str): Chloë script path
-        linearise_gene (str): Gene to use for linearisation
+        linearise_genes (list): List of genes to try for linearisation
         metadata_dict (dict): Metadata dictionary
         log_queue (queue.Queue, optional): Multiprocessing-safe queue for logging
         
@@ -2663,7 +2718,7 @@ def process_single_fasta_file(fasta_file, annotated_genomes_dir, chloe_project_d
                     seq_name, 
                     chloe_project_dir, 
                     chloe_script_path, 
-                    linearise_gene, 
+                    linearise_genes, 
                     metadata_dict, 
                     input_basename,  # Original multi-sequence filename for metadata lookup
                     worker_logger
@@ -2710,7 +2765,7 @@ def process_single_fasta_file(fasta_file, annotated_genomes_dir, chloe_project_d
                 filename_prefix, 
                 chloe_project_dir, 
                 chloe_script_path, 
-                linearise_gene, 
+                linearise_genes, 
                 metadata_dict, 
                 input_basename,
                 worker_logger
@@ -4218,13 +4273,16 @@ def main(args):
         # Parse required metadata TSV file
         metadata_dict = parse_metadata_tsv(args.metadata_tsv, args.genome_fasta_dir)
 
+        # Validate linearization genes against gene_synonyms.txt
+        validated_linearise_genes = validate_linearization_genes(args.linearise_gene, gene_synonyms, logger)
+
         # Annotate the genomes using chloë, honouring optional user-specified chloe paths
         annotated_genomes_dict = annotate_genomes(
             args.genome_fasta_dir,
             args.output_directory,
             args.chloe_project_dir,
             args.chloe_script,
-            args.linearise_gene,
+            validated_linearise_genes,
             metadata_dict,
             args.pool,
             log_queue

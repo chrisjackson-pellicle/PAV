@@ -112,9 +112,11 @@ def _add_general_options_group(parser, include_chloe=True):
                                  help='Path to the chloe.jl script. Must be provided together with --chloe_project_dir.')
         optional_group_general.add_argument('--linearise_gene',
                                  type=str,
-                                 default='psbA',
+                                 nargs='+',
+                                 default=['psbA'],
                                  metavar='GENE_NAME',
-                                 help='Gene to use for genome linearisation. Default is: %(default)s')
+                                 help='Gene(s) to use for genome linearisation. Can specify multiple genes. '
+                                      'Genes will be tried in order until one is found. Default is: %(default)s')
     
     optional_group_general.add_argument('--run_profiler',
                               action='store_true',

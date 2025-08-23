@@ -268,12 +268,25 @@ pav annotate_and_check \
   --no_alignment
 ```
 
-#### Custom linearization gene:
+#### Custom linearization gene(s):
 ```bash
+# Single gene (default behavior)
 pav annotate_and_check \
   genomes/ \
   metadata.tsv \
-  --linearize_gene rbcL
+  --linearize_gene psbA
+
+# Multiple genes (tried in order until one is found)
+pav annotate_and_check \
+  genomes/ \
+  metadata.tsv \
+  --linearize_gene psbA rbcL matK
+
+# Mixed case (handles gene name mapping)
+pav annotate_and_check \
+  genomes/ \
+  metadata.tsv \
+  --linearize_gene ATPA psbA rbcL
 ```
 
 #### High-performance processing:
@@ -367,7 +380,7 @@ output_dir/
 - Supports both single and multi-sequence FASTA files per sample
 - For multi-sequence FASTA files, each sequence is processed separately with Chloë
 - Performs initial annotation on original sequences
-- Linearizes genomes upstream of a specified gene (default: psbA), unless sample is recorded as `linear` in metadata. If the gene is not found in the sequence, no linearisation occurs
+- Linearizes genomes upstream of specified gene(s) (default: psbA), unless sample is recorded as `linear` in metadata. Multiple genes can be specified and will be tried in order until one is found. If no specified genes are found in the sequence, no linearisation occurs
 - Re-annotates linearized sequences
 
 #### 2. Reference Validation
@@ -413,6 +426,10 @@ output_dir/
 #### 5. Intergenic Region Analysis
 - Same intergenic analysis as the full pipeline
 - Extracts and analyzes intergenic regions
+
+## Linearization
+
+PAV automatically linearizes plastid genomes upstream of specified gene(s) to ensure consistent annotation and to avoid issues with genes that span the circular genome boundary.
 
 ## Gene naming conventions
 
@@ -464,7 +481,7 @@ Notes:
 
 ## Intergenic regions reports
 
-Note that the database of coding regions used in the intergenic analyses is derived the genomes in the [`/data/order_genomes`](https://github.com/chrisjackson-pellicle/PAV/tree/main/plastid_annotation_validator/data/order_genomes) folder. These genomes can have mis-annotations, leading to **spurious detection of genes in the intergenic regions of your genomes**. For example, if an `rrn23` annotation in the reference database has a 5' termini that was incorrectly extended in to upstream intergenic sequence (e.g. `NC_036304`), `rrn23` may be reported in the homologous intergenic region of your genome. This is a limitation of the reference database, and will be improved in future releases. 
+Note that the database of coding regions used in the intergenic analyses is derived from the genomes in the [`/data/order_genomes`](https://github.com/chrisjackson-pellicle/PAV/tree/main/plastid_annotation_validator/data/order_genomes) folder. These genomes can have mis-annotations, leading to **spurious detection of genes in the intergenic regions of your genomes**. For example, if an `rrn23` annotation in the reference database has a 5' termini that was incorrectly extended in to upstream intergenic sequence (e.g. `NC_036304`), `rrn23` may be reported in the homologous intergenic region of your genome. This is a limitation of the reference database, and will be improved in future releases. 
 
 ## Using existing Genbank files with `pav check`
 
@@ -561,7 +578,7 @@ Reference gene lengths are stored in [`data/plDNA_genes_median_lengths.csv`](htt
 4. **Metadata TSV columns**: Ensure the TSV has the required columns listed above
 5. **Memory issues**: Reduce `--pool` and `--threads` parameters
 6. **Custom reference folder not found**: Verify the path to your custom reference folder exists and contains GenBank files
-7. **Linearization gene not found**: If the specified linearization gene is not found in a genome, the original sequence will be used without linearization
+7. **Linearization gene(s) not found**: If none of the specified linearization genes are found in a genome, the original sequence will be used without linearization. Genes are validated against the gene_synonyms.txt file to ensure they are legitimate plastid genes
 8. **Gzipped GenBank files**: PAV supports both compressed (.gz) and uncompressed GenBank files as input for the `check` subcommand
 
 ## Support
