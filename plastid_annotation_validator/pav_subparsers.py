@@ -110,7 +110,7 @@ def _add_general_options_group(parser, include_chloe=True):
                                  default=None,
                                  metavar='PATH',
                                  help='Path to the chloe.jl script. Must be provided together with --chloe_project_dir.')
-        optional_group_general.add_argument('--linearise_gene', '-linearise_gene',
+        optional_group_general.add_argument('--linearise_gene',
                                  type=str,
                                  default='psbA',
                                  metavar='GENE_NAME',

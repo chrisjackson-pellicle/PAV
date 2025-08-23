@@ -88,6 +88,8 @@ pav check \
   --output_directory /path/to/output
 ```
 
+See [this caveat](https://github.com/chrisjackson-pellicle/PAV/tree/main?tab=readme-ov-file#using-existing-genbank-files-with-pav-check).
+
 ### Command Line Options
 
 #### `pav annotate_and_check` - Full annotation and validation pipeline
@@ -460,8 +462,28 @@ Notes:
 
 ## Intergenic region reports
 
-Note that the database of coding regions used in the intergenic analyses is derived the genomes in the [`/data/order_genomes`](https://github.com/chrisjackson-pellicle/PAV/tree/main/plastid_annotation_validator/data/order_genomes) folder. These genomes can have mis-annotations, leading to **spurious detection of genes in the intergenic regions of your genomes**. For example, if an `rrn23` annotation in the reference database has a 5' termini that was incorrectly extended in to upstream intergenic sequence (e.g. `NC_036304`), `rrn23` may be reported in the homologous intergenic region of your genome. This is a limitation of the reference database, and will be improved in future releases.   
- 
+Note that the database of coding regions used in the intergenic analyses is derived the genomes in the [`/data/order_genomes`](https://github.com/chrisjackson-pellicle/PAV/tree/main/plastid_annotation_validator/data/order_genomes) folder. These genomes can have mis-annotations, leading to **spurious detection of genes in the intergenic regions of your genomes**. For example, if an `rrn23` annotation in the reference database has a 5' termini that was incorrectly extended in to upstream intergenic sequence (e.g. `NC_036304`), `rrn23` may be reported in the homologous intergenic region of your genome. This is a limitation of the reference database, and will be improved in future releases. 
+
+## Using existing Genbank files with `pav check`
+
+PAV can be used to check the annotations of existing plastid genome GenBank files. To use this feature, provide a folder of GenBank files as input to the `pav check` command. 
+
+However, some annotation programs (including Chloe) attempt to annotate genes that might cross/bridge the ends of a linear fasta input sequence (e.g. the 5' end of `rps19` will be annotated at the 3' end of the input fasta sequence, and the 3' end of `rps19` will be annotated at the 5' end of the fasta sequence). In the case of Chloë (as of 23rd August 2025), if an incomplete fasta sequence (e.g. a sequence that can not be circularised, and has a partial `rps19` annotation at the 3' end of the fasta sequence, whereas the 5' end begins with intergenic sequence) this can result in a partially incorrect `rps19` annotation. This occurs because Chloe identifies the CDS for a putative gene by finding a corresponding ORF; if the 5' end of the fasta sequence (intergenic sequence in this example) allows the ORF of the correct `rps19` region at the 3' end of the fasta sequence to be extended before reaching an in-frame stop codon, the resulting ORF (containing intergenic sequence) will be returned as the `rps19` CDS.
+
+Even if the `rps19` annotation is correct (i.e. the input fasta sequence can be circularised, but happens to be linearised halfway through the `rps19` CDS), the outcome is an annotation interval that extends beyond the end length coordinate of the input sequence (e.g. `rps19` is annotated with an interval of `156176..**156472**`, whereas the input sequence is only 156,374 bp). This is an issue with the current implementation of PAV, which uses the Biopython SeqIO Genbank parser to extract CDS sequences (i.e. using `feature.location.extract(record.seq)`). The Biopython Genbank parser does not handle the interval `156176..**156472**` correctly, and instead returns a sequence corresonding to the interval `156176..156374` (i.e. the sequence is truncated to the 3' end of the fasta sequence. This can result in spurious gene length warnings in the PAV report files, such as:
+
+```
+['Gene rps19 length mismatch: Expected 297 != Extracted 199 for copy 1 - check this gene manually!', 'CDS length 199 is not a multiple of 3 for copy 1', "Stop codon is TGG, expected one of ['TAA', 'TAG', 'TGA'] for copy 1"]
+```
+
+When annotating fasta sequences using `pav annotate_and_check`, PAV tries to avoid this issue using a two-pass approach:
+ 1) The input sequence is annotated once with Chloe
+ 2) The location of a specified gene is recovered (`psbA` by default, change with `--linearise_gene` <gene_name>) and the input fasta is linearised just upstream.
+ 3) The input sequence is annotated again with Chloe, this time using the linearised sequence as input. Consequently, no annotation should cross/bridge the ends of the annotated fasta sequence. 
+
+Note that if the specified gene for lineaisation can't be found, the fasta sequence is processed as is. So, if a fragmented assembly with multiple fasta records is used as input, `psbA` may be found (and used for linearisation) in once sequence, but the other will be processed as is (i.e. no linearisation is applied), potentially leading to to issue described above.
+
+
 ## Gene Types Supported
 
 PAV processes and validates three main types of plastid genes:
