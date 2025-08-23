@@ -53,6 +53,7 @@ PAV is designed to process plastid genome assemblies, perform automated annotati
    - biopython>=1.81
    - pandas>=1.5.0
    - tqdm>=4.64.0
+   
 
    ```bash
    pip install -r requirements.txt
