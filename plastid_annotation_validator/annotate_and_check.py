@@ -440,6 +440,7 @@ def check_single_sample_genes(sample_data, gene_median_lengths, min_threshold, m
         gbk_files = sample_data['gbk_files']
 
         length_warnings = set()
+        warnings_to_log_to_screen = set()
         
         # Process each file for a sample and combine the results
         sequence_gene_data = {}
@@ -568,7 +569,8 @@ def check_single_sample_genes(sample_data, gene_median_lengths, min_threshold, m
                         gene_info['details'] = 'OK'
 
                 else:
-                    worker_logger.warning(f"{"[WARNING]:":10} Gene {gene_name_no_copy_suffix} not in gene_median_lengths")
+                    worker_logger.debug(f"{"[DEBUG]:":10} Gene {gene_name_no_copy_suffix} from sample {sample_name} not in gene_median_lengths")
+                    warnings_to_log_to_screen.add(f"Gene {gene_name_no_copy_suffix} from sample {sample_name} not in gene_median_lengths")
                     gene_info['issue'] = 'not_in_median_lengths'
                     gene_info['details'] = 'Not in reference median lengths'
                     length_warnings.add(gene_name)
@@ -594,7 +596,8 @@ def check_single_sample_genes(sample_data, gene_median_lengths, min_threshold, m
             'gene_rRNA_info': combined_gene_rRNA_info,
             'gene_tRNA_info': combined_gene_tRNA_info,
             'missing_genes': genes_in_median_not_in_lengths,
-            'sequence_gene_data': sequence_gene_data
+            'sequence_gene_data': sequence_gene_data,
+            'warnings_to_log_to_screen': warnings_to_log_to_screen
         }
 
         return True, result_dict
@@ -671,6 +674,8 @@ def check_genes(gene_median_lengths, annotated_genomes_dict, min_threshold, max_
         sample_data_list.append(sample_data)
 
     # Process samples with multiprocessing and progress bar
+
+    warnings_to_log_to_screen = []
     with ProcessPoolExecutor(max_workers=pool_size) as executor:
         # Submit all tasks
         future_to_sample = {
@@ -696,9 +701,13 @@ def check_genes(gene_median_lengths, annotated_genomes_dict, min_threshold, max_
 
                 all_sample_results[sample_name] = result
                 total_warnings += result['genes_with_warnings']
+                warnings_to_log_to_screen.extend(result['warnings_to_log_to_screen'])
 
             else:
                 utils.log_manager.handle_error(result[0], result[1], "check_genes()", sample_name)
+
+    for warning in warnings_to_log_to_screen:
+        logger.warning(f"{"[WARNING]:":10} {warning}")
 
     # Generate and write report
     write_gene_length_report(all_sample_results, logger, min_threshold, max_threshold, report_directory,
@@ -868,8 +877,8 @@ def write_gene_length_report(all_results, logger, min_threshold, max_threshold, 
         with open(sample_report_file, 'w') as f:
             f.write('\n'.join(sample_tsv_lines))
         
-        logger.info(f"{" ":15} Sample {sample_name}: ({len(sample_tsv_lines)-1} genes, {warnings_found} warnings, "
-                    f"{missing_genes_count} missing genes)")
+        logger.info(f"{"[INFO]:":10} Sample {sample_name}: {total_genes_count} genes (including multi-copy), "
+                    f"{warnings_found} warnings, {missing_genes_count} missing genes from 113-gene reference set")
     
     logger.info(f"")
     
