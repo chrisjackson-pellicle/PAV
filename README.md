@@ -478,7 +478,7 @@ Even if the `rps19` annotation is correct (i.e. the input fasta sequence can be 
 
 When annotating fasta sequences using `pav annotate_and_check`, PAV tries to avoid this issue using a two-pass approach:
  1) The input sequence is annotated once with Chloe
- 2) The location of a specified gene is recovered (`psbA` by default, change with `--linearise_gene` <gene_name>) and the input fasta is linearised just upstream.
+ 2) The location of a specified gene is recovered (`psbA` by default, can be changed with `--linearise_gene <gene_name>`) and the input fasta is linearised just upstream.
  3) The input sequence is annotated again with Chloe, this time using the linearised sequence as input. Consequently, no annotation should cross/bridge the ends of the annotated fasta sequence. 
 
 Note that if the specified gene for lineaisation can't be found, the fasta sequence is processed as is. So, if a fragmented assembly with multiple fasta records is used as input, `psbA` may be found (and used for linearisation) in once sequence, but the other will be processed as is (i.e. no linearisation is applied), potentially leading to the issue described above. 
