@@ -419,7 +419,7 @@ PAV follows the gene naming conventions used by Chloë, e.g.
 - `ndhK` rather than `psbG`
 - etc.
 
-This means that if you run `pav check` on a genomes with the annotation `ycf3`, the corresponding alignment produced by PAV will be named e.g. `pafI_all_samples_alignment.fasta`.
+This means that if you run `pav check` on a genome with the annotation `ycf3`, the corresponding alignment produced by PAV will be named e.g. `pafI_all_samples_alignment.fasta`.
 
 See the full list of synonyms [here](https://github.com/chrisjackson-pellicle/PAV/blob/main/plastid_annotation_validator/data/gene_synonyms.txt).
 
