@@ -12,7 +12,7 @@ A tool for annotating and validating angiosperm plastid genome annotations, with
 
 ## Overview
 
-PAV is designed to process plastid genome assemblies, perform automated annotation using [Chloë](https://github.com/ian-small/Chloe.jl), validate gene annotations against reference sequences, and generate comprehensive reports. The tool includes features for genome linearization, reference-based alignment, detailed quality assessment, and EMBL/ENA template generation. PAV supports both single and multi-sequence FASTA files per sample, with the latter allowing for fragmented assemblies.
+PAV is designed to process plastid genome assemblies, perform automated annotation using [Chloë](https://github.com/ian-small/Chloe.jl), validate gene annotations against reference sequences, and generate comprehensive reports. The tool includes features for genome linearisation, reference-based alignment, detailed quality assessment, and EMBL/ENA template generation. PAV supports both single and multi-sequence FASTA files per sample, with the latter allowing for fragmented assemblies.
 
 ## Features
 
@@ -53,7 +53,7 @@ PAV is designed to process plastid genome assemblies, perform automated annotati
    - biopython>=1.81
    - pandas>=1.5.0
    - tqdm>=4.64.0
-   
+
 
    ```bash
    pip install -r requirements.txt
@@ -282,19 +282,19 @@ pav annotate_and_check \
 pav annotate_and_check \
   genomes/ \
   metadata.tsv \
-  --linearize_gene psbA
+  --linearise_gene psbA
 
 # Multiple genes (tried in order until one is found)
 pav annotate_and_check \
   genomes/ \
   metadata.tsv \
-  --linearize_gene psbA rbcL matK
+  --linearise_gene psbA rbcL matK
 
 # Mixed case (handles gene name mapping)
 pav annotate_and_check \
   genomes/ \
   metadata.tsv \
-  --linearize_gene ATPA psbA rbcL
+  --linearise_gene ATPA psbA rbcL
 ```
 
 #### High-performance processing:
@@ -329,7 +329,7 @@ output_dir/
 │       ├── <prefix>.round1.chloe.gff            # Original GFF (preserved)
 │       ├── <prefix>.round2.chloe.gbk            # Re-annotated after linearization
 │       ├── <prefix>.round2.chloe.gff            # Re-annotated after linearization
-│       └── <prefix>.round2.fasta                # Linearized sequence
+│       └── <prefix>.round2.fasta                # Linearised sequence
 │       └── <prefix>.round2.chloe_intergenic_debug.fasta   # Optional (when --debug_intergenic)
 │       └── <prefix>_seq001_<seqname>.fasta      # Individual sequences (multi-sequence files only)
 │       └── <prefix>_seq001_<seqname>.round1.chloe.gbk  # Individual sequence annotations
@@ -388,8 +388,8 @@ output_dir/
 - Supports both single and multi-sequence FASTA files per sample
 - For multi-sequence FASTA files, each sequence is processed separately with Chloë
 - Performs initial annotation on original sequences
-- Linearizes genomes upstream of specified gene(s) (default: psbA), unless sample is recorded as `linear` in metadata. Multiple genes can be specified and will be tried in order until one is found. If no specified genes are found in the sequence, no linearisation occurs
-- Re-annotates linearized sequences
+- Linearises genomes upstream of specified gene(s) (default: `psbA`), unless sample is recorded as `linear` in metadata. Multiple genes can be specified and will be tried in order until one is found. If no specified genes are found in the sequence, no linearisation occurs
+- Re-annotates linearised sequences
 
 #### 2. Reference Validation
 - Loads reference sequences from multiple sources (CDS, rRNA, and tRNA)
@@ -437,7 +437,7 @@ output_dir/
 
 ## Linearization
 
-PAV automatically linearizes plastid genomes upstream of specified gene(s) to ensure consistent annotation and to avoid issues with genes that span the circular genome boundary.
+PAV automatically linearises plastid genomes upstream of specified gene(s) to ensure consistent annotation and to avoid issues with genes that span the circular genome boundary.
 
 ## Gene naming conventions
 
@@ -485,7 +485,7 @@ Notes:
 - The topology is used in the ENA `ID` line and must match one of: `linear`, `circular`
 - **For `pav annotate_and_check`**: All samples must be present in the metadata file
 - **For `pav check`**: Metadata is optional - if not provided, samples will be processed without metadata
-- Samples marked as `linear` will **not be re-linearized** at the `--linearize_gene` position, preserving their original linear structure
+- Samples marked as `linear` will **not be relinearised** at the `--linearise_gene` position, preserving their original linear structure
 
 ## Intergenic regions reports
 
@@ -534,7 +534,7 @@ Reference sequences are named using the format: `{Order}_{Family}_{Genus}_{Speci
 - **GenBank**: Annotated genomes in GenBank format (from Chloë)
 - **GFF**: Gene feature format files (from Chloë)
 - **EMBL**: European Molecular Biology Laboratory format
-- **FASTA**: Aligned sequences and linearized genomes
+- **FASTA**: Aligned sequences and linearised genomes
 
 ## Reference Data
 
