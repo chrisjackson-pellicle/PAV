@@ -83,6 +83,13 @@ def _add_intergenic_group(parser):
                                  default=1,
                                  dest='max_blast_hits',
                                  help='Maximum number of BLAST hits to retain per intergenic region. Default is: %(default)s')
+    
+    intergenic_group.add_argument('--custom_blast_db', '-blast_db',
+                                 metavar='PATH',
+                                 type=str,
+                                 default=None,
+                                 dest='custom_blast_db',
+                                 help='Custom BLAST database path or directory for intergenic region analysis. Can be a direct path to the database or a directory containing BLAST database files. If not provided, uses the default order_genomes_blastdb.')
 
 
 def _add_general_options_group(parser, include_chloe=True):
@@ -92,6 +99,7 @@ def _add_general_options_group(parser, include_chloe=True):
                                 type=str,
                                 default='output_directory',
                                 metavar='DIR',
+                                dest='output_directory',
                                 help='Output directory for the subcommand. Default is: %(default)s')
     optional_group_general.add_argument('--pool', '-p',
                                  type=int,
@@ -202,3 +210,44 @@ def check_parser(subparsers):
     _add_general_options_group(parser_check, include_chloe=False)
 
     return parser_check
+
+
+def db_for_intgen_parser(subparsers):
+    """
+    Parser for db_for_integen.py
+
+    :param argparse._SubParsersAction subparsers:
+    :return None: no return value specified; default is None
+    """
+
+    parser_db_for_intgen = subparsers.add_parser('db_for_intgen', help='Extract genes and features from GenBank files and create BLAST database for intergenic analyses')
+    
+    ####################################################################################################################
+    required_positional_group = parser_db_for_intgen.add_argument_group('Required input')
+    
+    required_positional_group.add_argument('input_dir',
+                                metavar='DIR',
+                                help='Input directory containing GenBank files (.gb, .gbk, .gb.gz, or .gbk.gz)')
+    
+    ####################################################################################################################
+    optional_group = parser_db_for_intgen.add_argument_group('Optional parameters')
+    
+    optional_group.add_argument('--output_directory', '-out_dir',
+                                type=str,
+                                default='output_directory_intgen_db',
+                                dest='output_directory',
+                                metavar='DIR',
+                                help='Output directory for the subcommand. Default is: %(default)s')
+    optional_group.add_argument('--min_length', 
+                               type=int, 
+                               default=10,
+                               metavar='INTEGER',
+                               help='Minimum sequence length to include. Default is: %(default)s')
+    optional_group.add_argument('--run_profiler',
+                              action='store_true',
+                              dest='run_profiler',
+                              default=False,
+                              help='If supplied, run the subcommand using cProfile. Saves a *.csv file of results. '
+                                   'Default is: %(default)s')
+
+    return parser_db_for_intgen

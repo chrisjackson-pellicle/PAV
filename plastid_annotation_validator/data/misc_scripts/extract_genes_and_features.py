@@ -8,6 +8,7 @@ import os
 import gzip
 import re
 from pathlib import Path
+from datetime import datetime
 from Bio import SeqIO
 from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
@@ -123,11 +124,11 @@ def process_genbank_file(gb_file, accession_to_info, order_name):
             feature_id = f"{order_name}_{family}_{species_clean}_{accession}"
             
             # Add feature type and gene name if available
-            feature_desc = feature.type
+            feature_desc = ''
             if 'gene' in feature.qualifiers:
-                feature_desc += f"_{feature.qualifiers['gene'][0]}"
+                feature_desc += f"{feature.qualifiers['gene'][0]}"
             elif 'product' in feature.qualifiers:
-                feature_desc += f"_{feature.qualifiers['product'][0]}"
+                feature_desc += f"{feature.qualifiers['product'][0]}"
             
             # Clean description for FASTA header
             feature_desc = re.sub(r'[^\w\-_]', '_', feature_desc)
@@ -154,15 +155,21 @@ def main():
     parser = argparse.ArgumentParser(description='Extract genes and features from GenBank files')
     parser.add_argument('--input_dir', default='plastid_annotation_validator/data/order_genomes',
                        help='Input directory containing order genomes')
-    parser.add_argument('--output_file', default='extracted_features.fasta',
-                       help='Output FASTA file')
+    parser.add_argument('--output_file', 
+                       help='Output FASTA file (default: extracted_features_YYYYMMDD_HHMMSS.fasta)')
     parser.add_argument('--min_length', type=int, default=10,
                        help='Minimum sequence length to include')
     
     args = parser.parse_args()
     
     input_dir = Path(args.input_dir)
-    output_file = args.output_file
+    
+    # Generate default output filename with timestamp if not provided
+    if args.output_file is None:
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        output_file = f'extracted_features_{timestamp}.fasta'
+    else:
+        output_file = args.output_file
     
     if not input_dir.exists():
         print(f"Error: Input directory {input_dir} does not exist")

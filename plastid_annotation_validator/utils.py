@@ -356,6 +356,8 @@ def check_dependencies(logger, entry='main'):
 
     if entry == 'check':
         executables = ['mafft', 'trimal', 'blastn']
+    elif entry == 'db_for_intgen':
+        executables = ['makeblastdb']
 
     logger.info(f'{"[INFO]:":10} Checking for external dependencies:\n')
 

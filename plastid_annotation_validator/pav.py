@@ -16,18 +16,22 @@ Main Features:
     - Intergenic region extraction and BLAST analysis
     - Comprehensive reporting and logging
     - Parallel processing for improved performance
+    - GenBank feature extraction and BLAST database creation for intergenic region analysis
 
 Usage:
     pav annotate_and_check [options]
     pav check [options]
+    pav db_for_intgen [options]
     
     For help on specific subcommands:
     pav annotate_and_check --help
     pav check --help
+    pav db_for_intgen --help
 
 Subcommands:
     annotate_and_check    Main annotation and validation pipeline
     check                 Continue pipeline from annotated GenBank files
+    db_for_intgen         Extract genes and features from GenBank files and create BLAST database for intergenic region analysis
     
 Options:
     --version             Show version information
@@ -43,6 +47,9 @@ Examples:
     
     # Continue pipeline from annotated GenBank files
     pav check annotated_genbank/ metadata.tsv -o output/
+    
+    # Extract features from GenBank files and create BLAST database for intergenic region analysis
+    pav db_for_intgen genbank_files/ -o output/ --min_length 50
 
 Dependencies:
     - chloë: Genome annotation pipeline
@@ -65,6 +72,7 @@ import os
 import plastid_annotation_validator.utils as utils
 import plastid_annotation_validator.annotate_and_check as annotate_and_check
 import plastid_annotation_validator.pav_subparsers as pav_subparsers
+import plastid_annotation_validator.db_for_integen as db_for_integen
 from plastid_annotation_validator.version import __version__
 
 
@@ -106,6 +114,25 @@ def check_main(args):
     annotate_and_check.check_pipeline(args)
 
 
+def db_for_intgen_main(args):
+    """
+    Calls the function main() from module db_for_integen
+
+    :param args: argparse namespace with subparser options for function db_for_integen.main()
+    :return: None: no return value specified; default is None
+    """
+
+    if len(sys.argv) > 1:
+        subcommand_name = sys.argv[1]
+    else:
+        subcommand_name = 'db_for_intgen'
+
+    args.subcommand_name = subcommand_name
+
+    # Run main() from module db_for_integen.py
+    db_for_integen.main(args)
+
+
 def parse_arguments():
     """
     Creates main parser and add subparsers. Parses command line arguments
@@ -127,11 +154,13 @@ def parse_arguments():
     subparsers = parser.add_subparsers(title='Subcommands for pav', metavar='')
     parser_annotate_and_check = pav_subparsers.annotate_and_check_parser(subparsers)
     parser_check = pav_subparsers.check_parser(subparsers)
+    parser_db_for_intgen = pav_subparsers.db_for_intgen_parser(subparsers)
 
 
     # Set functions for subparsers:
     parser_annotate_and_check.set_defaults(func=annotate_and_check_main)
     parser_check.set_defaults(func=check_main)
+    parser_db_for_intgen.set_defaults(func=db_for_intgen_main)
 
     # # Parse and return all arguments, known and unknown. Check unknown arguments:
     # arguments, unknown_arguments = parser.parse_known_args()

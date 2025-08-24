@@ -55,7 +55,7 @@ import importlib.resources
 import time
 import re
 
-# Import NewTargets modules:
+# Import PAV modules:
 from plastid_annotation_validator.version import __version__
 from plastid_annotation_validator import utils
 
@@ -3178,8 +3178,63 @@ def convert_embl_to_ena_template(embl_filepath, sample_metadata, record_seq_leng
     return ena_template_filepath
    
     
+def detect_blast_database(directory_path, logger=None):
+    """
+    Detect BLAST database files in a directory and return the database path.
+    
+    Args:
+        directory_path (str): Path to directory containing BLAST database files
+        logger: Logger instance for logging messages
+        
+    Returns:
+        str: Full path to the BLAST database (without extension) if found, None otherwise
+    """
+    if not os.path.exists(directory_path):
+        if logger:
+            logger.error(f"{"[ERROR]:":10} Directory does not exist: {directory_path}")
+        return None
+    
+    if not os.path.isdir(directory_path):
+        if logger:
+            logger.error(f"{"[ERROR]:":10} Path is not a directory: {directory_path}")
+        return None
+    
+    # Look for BLAST database files (common extensions: .nhr, .nin, .nsq for nucleotide)
+    blast_extensions = ['.nhr', '.nin', '.nsq', '.ndb', '.not', '.ntf', '.nto']
+    database_names = set()
+    
+    for filename in os.listdir(directory_path):
+        for ext in blast_extensions:
+            if filename.endswith(ext):
+                # Extract database name by removing extension
+                db_name = filename[:-len(ext)]
+                database_names.add(db_name)
+                break
+    
+    if not database_names:
+        if logger:
+            logger.error(f"{"[ERROR]:":10} No BLAST database files found in directory: {directory_path}")
+            logger.error(f"{"":10} Expected files with extensions: {', '.join(blast_extensions)}")
+        return None
+    
+    if len(database_names) > 1:
+        if logger:
+            logger.warning(f"{"[WARNING]:":10} Multiple BLAST databases found in directory: {directory_path}")
+            logger.warning(f"{"":10} Databases: {', '.join(sorted(database_names))}")
+            logger.warning(f"{"":10} Using the first one: {sorted(database_names)[0]}")
+    
+    # Use the first (or only) database found
+    db_name = sorted(database_names)[0]
+    db_path = os.path.join(directory_path, db_name)
+    
+    if logger:
+        logger.info(f"{"[INFO]:":10} Detected BLAST database: {db_name} in {directory_path}")
+    
+    return db_path
+
+
 def query_intergenic_regions(annotated_genomes_dict, output_directory, min_intergenic_length=50, blast_evalue=1e-10, 
-                             debug_intergenic=False, max_blast_hits=1, pool_size=1, threads=1, log_queue=None):
+                             debug_intergenic=False, max_blast_hits=1, pool_size=1, threads=1, log_queue=None, custom_blast_db=None):
     """
     Query intergenic regions from annotated genomes.
     
@@ -3188,6 +3243,12 @@ def query_intergenic_regions(annotated_genomes_dict, output_directory, min_inter
         output_directory (str): Output directory for results
         min_intergenic_length (int): Minimum length of intergenic region to analyze
         blast_evalue (float): BLAST E-value threshold
+        debug_intergenic (bool): Whether to write debug FASTA files
+        max_blast_hits (int): Maximum number of BLAST hits to retain per region
+        pool_size (int): Number of processes to use for multiprocessing
+        threads (int): Number of threads to use for each process
+        log_queue (queue.Queue, optional): Multiprocessing-safe queue for logging
+        custom_blast_db (str, optional): Custom BLAST database path. If None, uses default order_genomes_blastdb
     
     Returns:
         None
@@ -3199,17 +3260,31 @@ def query_intergenic_regions(annotated_genomes_dict, output_directory, min_inter
     os.makedirs(intergenic_output_dir, exist_ok=True)
 
     # Path to BLAST database
-    blast_db_path = os.path.join("plastid_annotation_validator", "data", "order_genomes_blastdb", "order_genomes_blastdb")
-    
-    # Try alternative paths if the first one doesn't work
-    if not os.path.exists(f"{blast_db_path}.nhr"):
-        # Try relative to current working directory
+    if custom_blast_db:
+        # Check if the provided path is a directory (containing BLAST database files)
+        if os.path.isdir(custom_blast_db):
+            # Detect BLAST database in the directory
+            blast_db_path = detect_blast_database(custom_blast_db, logger)
+            if blast_db_path is None:
+                logger.error(f"{"[ERROR]:":10} Failed to detect BLAST database in directory: {custom_blast_db}")
+                return
+        else:
+            # Assume it's a direct path to the BLAST database
+            blast_db_path = custom_blast_db
+            logger.info(f"{"[INFO]:":10} Using custom BLAST database: {blast_db_path}")
+    else:
+        # Use default BLAST database
         blast_db_path = os.path.join("plastid_annotation_validator", "data", "order_genomes_blastdb", "order_genomes_blastdb")
+        
+        # Try alternative paths if the first one doesn't work
         if not os.path.exists(f"{blast_db_path}.nhr"):
-            # Try absolute path from package
-            import plastid_annotation_validator
-            package_dir = os.path.dirname(plastid_annotation_validator.__file__)
-            blast_db_path = os.path.join(package_dir, "data", "order_genomes_blastdb", "order_genomes_blastdb")
+            # Try relative to current working directory
+            blast_db_path = os.path.join("plastid_annotation_validator", "data", "order_genomes_blastdb", "order_genomes_blastdb")
+            if not os.path.exists(f"{blast_db_path}.nhr"):
+                # Try absolute path from package
+                import plastid_annotation_validator
+                package_dir = os.path.dirname(plastid_annotation_validator.__file__)
+                blast_db_path = os.path.join(package_dir, "data", "order_genomes_blastdb", "order_genomes_blastdb")
     
     # Check if BLAST database exists
     if not os.path.exists(f"{blast_db_path}.nhr"):
@@ -3703,10 +3778,12 @@ def blast_intergenic_regions(intergenic_regions, blast_db_path, evalue_threshold
                     fields = line.strip().split('\t')
                     if len(fields) >= 12:
                         sseqid = fields[1]
+                        # Parse the new FASTA header format: Order_Family_genus_Species_accession_feature_type_[gene_name]
+                        # Extract hit_origin: everything before the feature_type_[gene_name] part (excluding feature_type)
                         hit_origin = '_'.join(sseqid.split('[')[0].split('_')[:-1])
-                        hit_origin = '_'.join(hit_origin.split('_')[:-1])
+                        hit_origin = '_'.join(hit_origin.split('_')[:-1])  # Remove feature_type
+                        # Extract hit_gene: the gene name inside the brackets
                         hit_gene = sseqid.split('[')[-1].rstrip(']')
-                        hit_gene = '_'.join(hit_gene.split('_')[1:])
                                             
                         blast_result = {
                             'sample_name': sample_name,
@@ -3746,7 +3823,7 @@ def blast_intergenic_regions(intergenic_regions, blast_db_path, evalue_threshold
                 if len(unique_results) >= max_blast_hits:
                     break
         
-        blast_results.extend(unique_results)
+        blast_results.extend(unique_results)    
         
         # Clean up temporary files
         os.unlink(temp_fasta_path)
@@ -4208,7 +4285,7 @@ def check_pipeline(args):
         if not args.skip_intergenic_analysis:
             query_intergenic_regions(annotated_genomes_dict, args.output_directory, args.min_intergenic_length,
                                      args.blast_evalue, args.debug_intergenic, args.max_blast_hits, args.pool,
-                                     args.threads, log_queue)
+                                     args.threads, log_queue, args.custom_blast_db)
         else:
             logger.info(f"{"[INFO]:":10} Skipping intergenic region analysis as requested")
  
@@ -4306,7 +4383,7 @@ def main(args):
         if not args.skip_intergenic_analysis:
             query_intergenic_regions(annotated_genomes_dict, args.output_directory, args.min_intergenic_length,
                                      args.blast_evalue, args.debug_intergenic, args.max_blast_hits, args.pool,
-                                     args.threads, log_queue)
+                                     args.threads, log_queue, args.custom_blast_db)
         else:
             logger.info(f"{"[INFO]:":10} Skipping intergenic region analysis as requested")
  

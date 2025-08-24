@@ -3,11 +3,11 @@
 ## Database Information
 - **Database Name**: order_genomes_blastdb
 - **Type**: Nucleotide database
-- **Source**: extracted_features_location_extract.fasta
-- **Sequences**: 90,632 features
-- **Total Bases**: 61,509,485
+- **Source**: extracted_features_20250824_154855.fasta
+- **Sequences**: 91,729 features
+- **Total Bases**: 61,548,141
 - **Longest Sequence**: 8,052 bases
-- **Creation Date**: August 18, 2025
+- **Creation Date**: August 24, 2025
 
 ## Database Files
 - `order_genomes_blastdb.ndb` - Database index
@@ -20,7 +20,7 @@
 - `order_genomes_blastdb.nto` - Taxonomy offset file
 
 ## Source Data
-This database was created from `extracted_features_location_extract.fasta`, which contains functional features extracted from GenBank files in the order_genomes directory. The extraction process uses BioPython's `location.extract()` method for improved sequence extraction, especially for complex features with multiple exons or features spanning sequence joins.
+This database was created from `extracted_features_20250824_154855.fasta`, which contains functional features extracted from GenBank files in the order_genomes directory. The extraction process uses BioPython's `location.extract()` method for improved sequence extraction, especially for complex features with multiple exons or features spanning sequence joins.
 
 The extraction process excludes:
 - source features
