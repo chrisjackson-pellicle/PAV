@@ -49,7 +49,7 @@ PAV processes plastid genome assemblies, performs automated annotation using [Ch
 2. **Install Python dependencies**:
   <br/><br/>
    Requires Python packages:
-   <br/><br/>
+
    - biopython>=1.81
    - pandas>=1.5.0
    - tqdm>=4.64.0
@@ -596,20 +596,46 @@ In the meantime, users can create their own database of coding regions by runnin
 
 PAV can be used to check the annotations of existing plastid genome GenBank files. To use this feature, provide a folder of GenBank files as input to the `pav check` command. 
 
-Some annotation programs (including Chloe) attempt to annotate genes that cross/bridge the ends of a linear fasta input sequence. For example, the 5' end of `rps19` might be annotated at the 3' end of the input fasta sequence, and the 3' end of `rps19` will be annotated at the 5' end of the fasta sequence. Moreover, in the case of Chloë (as of 23rd August 2025), if an incomplete genome fasta is provided (e.g. a sequence that can not be circularised due to partial assembly of a genome that is circular *in vivo*), and this sequence has a partial `rps19` gene at its 3' end but integenic sequence at its 5' end, this can result in a partially incorrect `rps19` annotation. This occurs because Chloe identifies the CDS for a putative gene by finding a corresponding ORF; if the correct `rps19` ORF at the 3' end of the fasta sequence can be extended in to the 5' end of the fasta sequence (intergenic sequence in this example) before reaching an in-frame stop codon, the resulting ORF (containing intergenic sequence) will be returned as the `rps19` CDS.
+### Important considerations when using existing GenBank files
 
-Even if the `rps19` annotation is correct (i.e. the input fasta sequence can be circularised, but happens to be linearised halfway through the `rps19` CDS), the outcome is an annotation interval that extends beyond the end length coordinate of the input sequence (e.g. `rps19` is annotated with an interval of `156176..156472`, whereas the input sequence is only 156,374 bp). This is an issue with the current implementation of PAV, which uses the Biopython SeqIO Genbank parser to extract CDS sequences (i.e. using `feature.location.extract(record.seq)`). The Biopython Genbank parser does not handle the interval `156176..156472` correctly, and instead returns a sequence corresonding to the interval `156176..156374` (i.e. the sequence is truncated to the 3' end of the fasta sequence). In these scenarios, PAV produces gene length warnings in the report files, such as:
+When using `pav check` with existing GenBank files, be aware of potential issues related to gene annotations that span the ends of linear sequences:
+
+#### 1. **Cross-boundary gene annotations**
+Some annotation programs (including Chloë) may annotate genes that cross the ends of a linear FASTA sequence. For example:
+- The 5' end of `rps19` might be annotated at the 3' end of the input sequence
+- The 3' end of `rps19` might be annotated at the 5' end of the input sequence
+
+#### 2. **Incomplete genome assemblies**
+If you provide an incomplete genome assembly (e.g., a sequence that cannot be circularised due to partial assembly of a genome that is circular *in vivo*), and this sequence has:
+- A partial `rps19` gene at its 3' end
+- Intergenic sequence at its 5' end
+
+This can result in partially incorrect `rps19` annotations. This occurs because Chloë identifies CDS regions by finding corresponding ORFs. If the correct `rps19` ORF at the 3' end can be extended into the 5' end (intergenic sequence) before reaching an in-frame stop codon, the resulting ORF (containing intergenic sequence) will be returned as the `rps19` CDS.
+
+#### 3. **Sequence truncation issues**
+Even if the `rps19` annotation is correct (i.e., the input sequence can be circularised but happens to be linearised halfway through the `rps19` CDS), the annotation interval may extend beyond the sequence length. For example:
+- `rps19` is annotated with interval `156176..156472`
+- The input sequence is only 156,374 bp long
+
+This creates an issue with PAV's current implementation, which uses the Biopython SeqIO GenBank parser to extract CDS sequences. The parser cannot handle intervals that extend beyond the sequence boundaries and instead truncates the sequence to the available length (e.g., `156176..156374`).
+
+In these scenarios, PAV will produce gene length warnings in the report files, such as:
 
 ```
 ['Gene rps19 length mismatch: Expected 297 != Extracted 199 for copy 1 - check this gene manually!', 'CDS length 199 is not a multiple of 3 for copy 1', "Stop codon is TGG, expected one of ['TAA', 'TAG', 'TGA'] for copy 1"]
 ```
 
-When annotating fasta sequences using `pav annotate_and_check`, PAV tries to avoid this issue using a two-pass approach:
- 1) The input sequence is annotated once with Chloe
- 2) The location of a specified gene is recovered (`psbA` by default, can be changed with `--linearise_gene <gene_name>`) and the input fasta is linearised just upstream.
- 3) The input sequence is annotated again with Chloe, this time using the linearised sequence as input. Consequently, no annotation should cross/bridge the ends of the annotated fasta sequence. 
+### How PAV handles these issues
 
-Note that if the specified gene for linearisation can't be found, the fasta sequence is processed as is. So, if a fragmented assembly with multiple fasta records is used as input, `psbA` may be found (and used for linearisation) in one sequence, but the others will be processed as is (i.e. no linearisation is applied), potentially leading to the issue described above. 
+When annotating FASTA sequences using `pav annotate_and_check`, PAV uses a two-pass approach to avoid these issues:
+
+1. **First annotation**: The input sequence is annotated once with Chloë
+2. **Linearization**: The location of a specified gene is recovered (`psbA` by default, can be changed with `--linearise_gene <gene_name>`) and the input FASTA is linearised just upstream
+3. **Second annotation**: The input sequence is annotated again with Chloë using the linearised sequence as input
+
+This approach ensures that no annotation should cross the ends of the annotated FASTA sequence.
+
+**Note**: If the specified gene for linearisation cannot be found, the FASTA sequence is processed as-is. For fragmented assemblies with multiple FASTA records, `psbA` may be found (and used for linearisation) in one sequence, but others will be processed without linearisation, potentially leading to the issues described above.
 
 
 ## Gene types supported
