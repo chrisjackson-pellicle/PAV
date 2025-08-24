@@ -2292,9 +2292,9 @@ def split_multi_sequence_fasta(fasta_file, output_dir, filename_prefix, logger=N
         return []
 
 
-def validate_linearization_genes(linearise_genes, gene_synonyms, logger=None):
+def validate_linearisation_genes(linearise_genes, gene_synonyms, logger=None):
     """
-    Validate that linearization genes are present in the gene_synonyms.txt file.
+    Validate that linearisation genes are present in the gene_synonyms.txt file.
     
     Args:
         linearise_genes (list): List of gene names to validate
@@ -2322,15 +2322,15 @@ def validate_linearization_genes(linearise_genes, gene_synonyms, logger=None):
                 mapped_gene = gene_synonyms[gene]
                 validated_genes.append(mapped_gene)
                 if logger:
-                    logger.debug(f"{"[DEBUG]:":10} Mapped linearization gene: {gene} -> {mapped_gene}")
+                    logger.debug(f"{"[DEBUG]:":10} Mapped linearisation gene: {gene} -> {mapped_gene}")
             else:
                 failed_genes.append(gene)
              
     if failed_genes:
-        logger.error(f"{"[ERROR]:":10} Failed to find the following linearization genes in gene_synonyms.txt: {', '.join(failed_genes)}")
+        logger.error(f"{"[ERROR]:":10} Failed to find the following linearisation genes in gene_synonyms.txt: {', '.join(failed_genes)}")
         utils.exit_program()
     
-    logger.info(f"{"[INFO]:":10} Using linearization genes: {', '.join(validated_genes)}")
+    logger.info(f"{"[INFO]:":10} Using linearisation genes: {', '.join(validated_genes)}")
     utils.log_separator(logger)
     
     return validated_genes
@@ -2372,7 +2372,7 @@ def linearise_genome_upstream_gene(gbk_file, fasta_file, output_dir, sample_name
         
         if gene_start is None:
             gene_list_str = ', '.join(linearise_genes)
-            logger.debug(f"{"[DEBUG]:":10} None of the linearization genes [{gene_list_str}] found in {sample_name} record {record.id}, using original sequence instead")
+            logger.debug(f"{"[DEBUG]:":10} None of the linearisation genes [{gene_list_str}] found in {sample_name} record {record.id}, using original sequence instead")
             return fasta_file
         
         # Read original fasta sequence
@@ -4274,8 +4274,8 @@ def main(args):
         # Parse required metadata TSV file
         metadata_dict = parse_metadata_tsv(args.metadata_tsv, args.genome_fasta_dir)
 
-        # Validate linearization genes against gene_synonyms.txt
-        validated_linearise_genes = validate_linearization_genes(args.linearise_gene, gene_synonyms, logger)
+        # Validate linearisation genes against gene_synonyms.txt
+        validated_linearise_genes = validate_linearisation_genes(args.linearise_gene, gene_synonyms, logger)
 
         # Annotate the genomes using chloë, honouring optional user-specified chloe paths
         annotated_genomes_dict = annotate_genomes(

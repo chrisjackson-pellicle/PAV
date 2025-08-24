@@ -55,28 +55,33 @@ def _add_intergenic_group(parser):
                                  metavar='INTEGER',
                                  type=int,
                                  default=0,
+                                 dest='min_intergenic_length',
                                  help='Minimum length of intergenic region to analyze. Default is: %(default)s')
     
     intergenic_group.add_argument('--blast_evalue', '-evalue',
                                  metavar='FLOAT',
                                  type=float,
                                  default=1e-10,
+                                 dest='blast_evalue',
                                  help='BLAST E-value threshold for intergenic region analysis. Default is: %(default)s')
     
     intergenic_group.add_argument('--skip_intergenic_analysis', '-skip_ig',
                                  action='store_true',
                                  default=False,
+                                 dest='skip_intergenic_analysis',
                                  help='Skip intergenic region analysis. Default is: %(default)s')
     
     intergenic_group.add_argument('--debug_intergenic', '-debug_ig',
                                  action='store_true',
                                  default=False,
+                                 dest='debug_intergenic',
                                  help='Write intergenic regions to FASTA files for debugging. Default is: %(default)s')
     
     intergenic_group.add_argument('--max_blast_hits', '-max_hits',
                                  metavar='INTEGER',
                                  type=int,
                                  default=1,
+                                 dest='max_blast_hits',
                                  help='Maximum number of BLAST hits to retain per intergenic region. Default is: %(default)s')
 
 
@@ -92,11 +97,13 @@ def _add_general_options_group(parser, include_chloe=True):
                                  type=int,
                                  default=1,
                                  metavar='INTEGER',
+                                 dest='pool',
                                  help='The number of CPUs to use for the subcommand. Default is: %(default)s')
     optional_group_general.add_argument('--threads', '-t',
                                  type=int,
                                  default=1,
                                  metavar='INTEGER',
+                                 dest='threads',
                                  help='The number of threads to use for the subcommand. Default is: %(default)s')
     
     if include_chloe:
@@ -104,11 +111,13 @@ def _add_general_options_group(parser, include_chloe=True):
                                  type=str,
                                  default=None,
                                  metavar='DIR',
+                                 dest='chloe_project_dir',
                                  help='Path to the chloe project directory to use as --project for Julia. Must be provided together with --chloe_script.')
         optional_group_general.add_argument('--chloe_script', '-chloe_jl',
                                  type=str,
                                  default=None,
                                  metavar='PATH',
+                                 dest='chloe_script',
                                  help='Path to the chloe.jl script. Must be provided together with --chloe_project_dir.')
         optional_group_general.add_argument('--linearise_gene',
                                  type=str,
