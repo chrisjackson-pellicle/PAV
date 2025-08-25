@@ -610,10 +610,10 @@ If you provide an incomplete genome assembly (e.g., a sequence that cannot be ci
 - A partial `rps19` gene at its 3' end
 - Intergenic sequence at its 5' end
 
-This can result in partially incorrect `rps19` annotations. This occurs because Chloë identifies CDS regions by finding corresponding ORFs. If the correct `rps19` ORF at the 3' end can be extended into the 5' end (intergenic sequence) before reaching an in-frame stop codon, the resulting ORF (containing intergenic sequence) will be returned as the `rps19` CDS.
+This can result in a partially incorrect `rps19` annotation. This occurs because Chloë annotates CDS regions by finding corresponding ORFs. If the correct partial `rps19` ORF at the 3' end can be extended into the 5' end (intergenic sequence) before reaching an in-frame stop codon, the resulting ORF (containing intergenic sequence) will be returned as the `rps19` CDS.
 
 #### 3. **Sequence truncation issues**
-Even if the `rps19` annotation is correct (i.e., the input sequence can be circularised but happens to be linearised halfway through the `rps19` CDS), the annotation interval may extend beyond the sequence length. For example:
+Even if the `rps19` annotation is correct (i.e., the input sequence can be circularised but happens to be linearised halfway through the `rps19` CDS), the annotation interval extends beyond the sequence length. For example:
 - `rps19` is annotated with interval `156176..156472`
 - The input sequence is only 156,374 bp long
 
