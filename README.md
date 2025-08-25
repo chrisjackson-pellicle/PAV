@@ -58,6 +58,13 @@ PAV processes plastid genome assemblies, performs automated annotation using [Ch
    pip install -r requirements.txt
    ```
 
+   or 
+   ```bash
+   conda install conda-forge::biopython
+   conda install anaconda::tqdm
+   conda install conda-forge::pandas
+   ```
+
 3. **Install Chloë**:
   <br/><br/>
    Follow Chloë installation instructions [here](https://github.com/ian-small/Chloe.jl?tab=readme-ov-file#installation)
@@ -68,13 +75,13 @@ PAV processes plastid genome assemblies, performs automated annotation using [Ch
 4. **Install external tools**:
    ```bash
    # Install MAFFT
-   conda install mafft
+   conda install bioconda::mafft
 
    # Install TrimAl
-   conda install trimal
+   conda install bioconda::trimal
 
    # Install BLAST+
-   conda install -c bioconda blast
+   conda install bioconda::blast
    ```
 
 ## Usage
