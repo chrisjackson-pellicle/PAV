@@ -451,6 +451,7 @@ def log_completion_time(start_time, logger=None, label='Completed'):
     except Exception:
         # Swallow any timing/logging errors to avoid masking real failures
         pass
+    
 
 def handle_process_result(result, id, operation_name, logger, log_listener):
     """Handle the result from a worker process, checking for errors and logging appropriately.
@@ -674,4 +675,24 @@ def exit_program():
         None
     """
     log_manager.cleanup()
-    sys.exit(1) 
+    sys.exit(1)
+
+
+def setup_log_and_report_directories(args):
+    """Set up log and report directories and add them to args.
+    
+    Creates the log and report directories under the output directory structure
+    and sets them as attributes on the args object for later use.
+    
+    Args:
+        args: argparse.Namespace object containing output_directory attribute
+        
+    Returns:
+        None: Modifies args object in place by adding log_directory and report_directory attributes
+    """
+    log_directory = os.path.join(args.output_directory, '00_logs_and_reports/logs')
+    report_directory = os.path.join(args.output_directory, '00_logs_and_reports/reports')
+    createfolder(log_directory)
+    createfolder(report_directory)
+    args.log_directory = log_directory
+    args.report_directory = report_directory 

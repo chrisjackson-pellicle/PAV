@@ -190,14 +190,6 @@ def main():
     # Parse arguments for the command/subcommand used:
     args = parse_arguments()
 
-    # Create a directory for logs and reports, passed to the subcommand main() function:
-    log_directory = utils.createfolder(os.path.join(args.output_directory, '00_logs_and_reports/logs'))
-    report_directory = utils.createfolder(os.path.join(args.output_directory, '00_logs_and_reports/reports'))
-
-    # Add log_directory and report_directory to args:
-    args.log_directory = log_directory
-    args.report_directory = report_directory
-
     # Run the function associated with the subcommand, with or without cProfile:
     if args.run_profiler:
         profiler = cProfile.Profile()

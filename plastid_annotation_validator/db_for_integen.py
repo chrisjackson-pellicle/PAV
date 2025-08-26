@@ -352,10 +352,13 @@ def main(args):
     try:
         global logger, log_queue, log_listener
 
+        # Set up log and report directories
+        utils.setup_log_and_report_directories(args)
+
         # Set up global logger
         logger, log_queue, log_listener = utils.log_manager.setup(
             __name__, 'db_for_intgen', log_directory=args.log_directory
-        )
+        ) 
             
         # Print arguments to screen and log
         utils.print_arguments(args, logger, __version__)

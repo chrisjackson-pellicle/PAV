@@ -12,7 +12,7 @@ A tool for annotating and validating angiosperm plastid genome annotations, with
 
 ## Overview
 
-PAV processes plastid genome assemblies, performs automated annotation using [Chloë](https://github.com/ian-small/Chloe.jl), validates gene annotations against reference sequences, and generates comprehensive reports. The tool includes features for genome linearisation, reference-based alignment, detailed quality assessment, and EMBL/ENA template generation. PAV supports both single and multi-sequence FASTA files per sample, with the latter allowing for fragmented assemblies.
+PAV processes plastid genome assemblies, performs annotation using [Chloë](https://github.com/ian-small/Chloe.jl), validates gene annotations against reference sequences, and generates comprehensive reports. The tool includes features for genome linearisation, reference-based alignment, detailed quality assessment, and EMBL/ENA template generation. PAV supports both single and multi-sequence FASTA files per sample, with the latter allowing for fragmented assemblies.
 
 ## Features
 

@@ -4227,14 +4227,14 @@ def check_pipeline(args):
         SystemExit: If input files or directories do not exist.
     """
 
-    # print(f'{"[INFO]:":10} Subcommand `check` not implemented yet!')
-    # return
-
     # Track wall-clock runtime for completion message
     start_time = time.time()
 
     try:
         global logger, log_queue, log_listener
+
+        # Set up log and report directories
+        utils.setup_log_and_report_directories(args)
 
         # Set up global logger
         logger, log_queue, log_listener = utils.log_manager.setup(
@@ -4328,10 +4328,13 @@ def main(args):
     try:
         global logger, log_queue, log_listener
 
+        # Set up log and report directories
+        utils.setup_log_and_report_directories(args)
+
         # Set up global logger
         logger, log_queue, log_listener = utils.log_manager.setup(
             __name__, 'annotate_and_check', log_directory=args.log_directory
-        )
+        ) 
 
         # Print arguments to screen and log:
         utils.print_arguments(args, logger, __version__)
