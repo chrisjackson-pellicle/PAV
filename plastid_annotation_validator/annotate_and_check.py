@@ -962,7 +962,7 @@ def get_references(args, gene_median_lengths, gene_synonyms=None):
             utils.exit_program()
     
     # If no specific references are specified, use default reference genomes
-    if not args.refs_order and not args.refs_folder:
+    if not args.refs_order and not args.custom_refs_folder:
         logger.info(f"{"[INFO]:":10} Using default reference genomes from data/reference_genomes_default")
         default_refs = get_ref_gene_seqrecords_from_default(gene_median_lengths, gene_synonyms)
     

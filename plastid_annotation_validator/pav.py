@@ -145,7 +145,7 @@ def parse_arguments():
                                      formatter_class=argparse.RawTextHelpFormatter,
                                      epilog='To view parameters and help for a subcommand, use e.g. "pav '
                                             '--help"')
-    parser.add_argument('--version', 
+    parser.add_argument('--version', '-v',
                         action='version', 
                         version=__version__,
                         help='Print the pav version number.')
