@@ -149,6 +149,15 @@ def parse_arguments():
                         action='version', 
                         version=__version__,
                         help='Print the pav version number.')
+    
+    parser.add_argument('--run_profiler',
+                        action='store_true',
+                        dest='run_profiler',
+                        default=False,
+                        help='If supplied, run the command using cProfile. Saves a *.csv file of results. '
+                             'Default is: %(default)s')
+    
+
 
     # Add subparsers:
     subparsers = parser.add_subparsers(title='Subcommands for pav', metavar='')
