@@ -34,7 +34,7 @@ Subcommands:
     db_for_intgen         Extract genes and features from GenBank files and create BLAST database for intergenic region analysis
     
 Options:
-    --version             Show version information
+    --version            Show version information
     --help               Show help message
     --run_profiler       Enable performance profiling
 
@@ -149,32 +149,25 @@ def parse_arguments():
                         action='version', 
                         version=__version__,
                         help='Print the pav version number.')
-    
-    parser.add_argument('--run_profiler',
-                        action='store_true',
-                        dest='run_profiler',
-                        default=False,
-                        help='If supplied, run the command using cProfile. Saves a *.csv file of results. '
-                             'Default is: %(default)s')
-    
-
 
     # Add subparsers:
-    subparsers = parser.add_subparsers(title='Subcommands for pav', metavar='')
+    subparsers = parser.add_subparsers(title='Subcommands for PAV', metavar='')
     parser_annotate_and_check = pav_subparsers.annotate_and_check_parser(subparsers)
     parser_check = pav_subparsers.check_parser(subparsers)
     parser_db_for_intgen = pav_subparsers.db_for_intgen_parser(subparsers)
-
 
     # Set functions for subparsers:
     parser_annotate_and_check.set_defaults(func=annotate_and_check_main)
     parser_check.set_defaults(func=check_main)
     parser_db_for_intgen.set_defaults(func=db_for_intgen_main)
 
-    # # Parse and return all arguments, known and unknown. Check unknown arguments:
-    # arguments, unknown_arguments = parser.parse_known_args()
-
+    # Parse arguments
     arguments = parser.parse_args()
+
+    # If no subcommand was provided, show help
+    if not hasattr(arguments, 'func'):
+        parser.print_help()
+        sys.exit(0)
 
     return arguments
 
