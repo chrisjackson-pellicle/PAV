@@ -19,6 +19,7 @@ import time
 import traceback
 import tempfile
 import subprocess
+import csv
 from pathlib import Path
 from datetime import datetime
 from Bio import SeqIO
@@ -202,6 +203,16 @@ def process_genbank_file(gb_file):
                 id=fasta_header,
                 description=""
             )
+            
+            # Store source file information in the SeqRecord object
+            seq_record.annotations['source_file'] = os.path.basename(gb_file)
+            seq_record.annotations['accession'] = accession
+            seq_record.annotations['feature_type'] = feature.type
+            seq_record.annotations['gene_name'] = feature_desc if feature_desc else 'N/A'
+            seq_record.annotations['order'] = order
+            seq_record.annotations['family'] = family
+            seq_record.annotations['genus'] = genus
+            seq_record.annotations['species'] = species_clean
 
             features.append(seq_record)
         
@@ -331,12 +342,68 @@ def write_blast_database(all_features, output_dir, db_name="intgen_db"):
         db_path = create_blast_database(temp_fasta_path, blast_db_dir, db_name)
         logger.info(f"{"[INFO]:":10} Successfully created BLAST database at: {db_path}")
         logger.info(f"{"[INFO]:":10} Database contains {len(all_features)} sequences")
+        utils.log_separator(logger)
         return db_path
     finally:
         # Clean up temporary FASTA file
         if os.path.exists(temp_fasta_path):
             os.unlink(temp_fasta_path)
             logger.debug(f"{"[DEBUG]:":10} Cleaned up temporary FASTA file: {temp_fasta_path}")
+
+
+def write_tsv_report(all_features, report_directory):
+    """Write a TSV report of extracted features.
+    
+    Args:
+        all_features (list): List of SeqRecord objects to write.
+        report_directory (str): Directory where the TSV report will be created.
+    """
+    report_path = os.path.join(report_directory, "extracted_features_report.tsv")
+    
+    with open(report_path, 'w', newline='') as f:
+        fieldnames = [
+            'Feature_ID', 'Sequence_Length', 'Feature_Type', 'Gene_Name', 'Product',
+            'Order', 'Family', 'Genus', 'Species', 'Accession', 'Source_File'
+        ]
+        writer = csv.DictWriter(f, fieldnames=fieldnames, delimiter='\t')
+        
+        writer.writeheader()
+        
+        for feature in all_features:
+            # Extract basic information
+            seq_length = len(feature.seq)
+            
+            # Get information from stored annotations
+            source_file = feature.annotations.get('source_file', 'unknown')
+            accession = feature.annotations.get('accession', 'unknown')
+            feature_type = feature.annotations.get('feature_type', 'unknown')
+            gene_name = feature.annotations.get('gene_name', 'N/A')
+            order = feature.annotations.get('order', 'unknown')
+            family = feature.annotations.get('family', 'unknown')
+            genus = feature.annotations.get('genus', 'unknown')
+            species = feature.annotations.get('species', 'unknown')
+            
+            # Try to get product from description if available
+            product = 'N/A'
+            if hasattr(feature, 'description') and feature.description:
+                product = feature.description
+            
+            writer.writerow({
+                'Feature_ID': feature.id,
+                'Sequence_Length': seq_length,
+                'Feature_Type': feature_type,
+                'Gene_Name': gene_name,
+                'Product': product,
+                'Order': order,
+                'Family': family,
+                'Genus': genus,
+                'Species': species,
+                'Accession': accession,
+                'Source_File': source_file
+            })
+    
+    logger.info(f"{"[INFO]:":10} TSV report written to: {report_path}")
+    logger.info(f"{"[INFO]:":10} Report contains {len(all_features)} features")
 
 
 def main(args):
@@ -362,15 +429,18 @@ def main(args):
             
         # Print arguments to screen and log
         utils.print_arguments(args, logger, __version__)
-     
+
         # Check for external dependencies:
-        utils.check_dependencies(logger, entry='db_for_intgen')
+        utils.check_dependencies(args, logger, entry='db_for_intgen')
         
         # Process GenBank files and extract features
         all_features = process_genbank_files(args.input_dir, args.min_length)
         
         # Create BLAST database
         write_blast_database(all_features, args.output_directory, "intgen_db")
+
+        # Write TSV report
+        write_tsv_report(all_features, args.report_directory)
         
     except Exception as e:
         utils.log_manager.handle_error(e, traceback.format_exc(), "db_for_intgen.main()")

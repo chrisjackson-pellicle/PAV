@@ -10,21 +10,26 @@
 
 A tool for annotating and validating angiosperm plastid genome annotations, with support for reference-based alignment, quality assessment, and characterisation of intergenic regions. 
 
+Current version: 1.0.0 (August 2025). See the change_log.md [here](https://github.com/chrisjackson-pellicle/PAV/blob/main/change_log.md)
+
 ## Overview
 
 PAV processes plastid genome assemblies, performs annotation using [Chloë](https://github.com/ian-small/Chloe.jl), validates gene annotations against reference sequences, and generates comprehensive reports. The tool includes features for genome linearisation, reference-based alignment, detailed quality assessment, and EMBL/ENA template generation. PAV supports both single and multi-sequence FASTA files per sample, with the latter allowing for fragmented assemblies.
 
 ## Features
 
-- **Automated annotation**: uses Chloë for plastid genome annotation
-- **Genome linearisation**: automatically linearises genomes upstream of a specified gene (defaults to `psbA`) unless genome is specified as 'linear' or the gene is not found
-- **Quality assessment**: validates gene lengths, identifies internal stop codons, and checks for canonical start and stop codons
-- **Reference-based validation**: compares annotations against reference genomes from multiple sources (order-specific, default, or custom)
-- **Alignment generation**: creates nucleotide alignments with reference sequences for CDS, rRNA, and tRNA genes
-- **Comprehensive reporting**: generates detailed reports and statistics
-- **EMBL and ENA template conversion**: converts annotated GenBank records to EMBL and produces ENA submission-ready templates
-- **Intergenic region analysis**: BLAST analysis of intergenic regions for functional characterization, with custom database option
-- **Multi-sequence support**: automatic detection and processing of multi-sequence FASTA files
+- **Automated annotation**: Uses Chloë for plastid genome annotation
+- **Genome linearization**: Automatically linearises genomes upstream of a specified gene (defaults to `psbA`) unless genome is specified as 'linear' or the gene is not found
+- **Quality assessment**: Validates gene lengths, identifies internal stop codons, and checks for canonical start and stop codons
+- **Reference-based validation**: Compares annotations against reference genomes from multiple sources (order-specific, default, or custom)
+- **Alignment generation**: Creates nucleotide alignments with reference sequences for CDS, rRNA, and tRNA genes
+- **Comprehensive reporting**: Generates detailed reports and statistics
+- **EMBL and ENA template conversion**: Converts annotated GenBank records to EMBL and produces ENA submission-ready templates
+- **Intergenic region analysis**: BLAST analysis of intergenic regions for functional characterization
+- **Custom BLAST databases**: Support for creating and using custom BLAST databases for intergenic analysis
+- **Multi-sequence support**: Automatic detection and processing of multi-sequence FASTA files
+- **Parallel processing**: Multi-threaded execution for improved performance
+
 
 ## Installation
 
@@ -65,14 +70,19 @@ PAV processes plastid genome assemblies, performs annotation using [Chloë](http
    conda install conda-forge::pandas
    ```
 
-3. **Install Chloë**:
+3. **Install Julia**:
+  <br/><br/>
+   Follow Julia installation instructions [here](https://julialang.org/install/)
+
+
+4. **Install Chloë**:
   <br/><br/>
    Follow Chloë installation instructions [here](https://github.com/ian-small/Chloe.jl?tab=readme-ov-file#installation)
   <br/><br/>
-   If using a conda environment, ensure Chloe and Chloe references are in `${CONDA_PREFIX}/bin` directory or supply the Chloe project dir and path to `Chloe.jl` to the `pav annotate_and_check` subcommand using the options `--chloe_project_dir` and `--chloe_script`, respectively. 
+   Supply the path to the Chloe project directory (e.g. `/your/path/to/chloe`) to the `pav annotate_and_check` subcommand
 
 
-4. **Install external tools**:
+5. **Install external tools**:
    ```bash
    # Install MAFFT
    conda install bioconda::mafft
@@ -127,32 +137,26 @@ usage: pav annotate_and_check [-h] [--min_length_percentage FLOAT]
                               [--debug_intergenic] [--max_blast_hits INTEGER]
                               [--custom_blast_db PATH]
                               [--output_directory DIR] [--pool INTEGER]
-                              [--threads INTEGER] [--chloe_project_dir DIR]
-                              [--chloe_script PATH]
-                              [--linearise_gene GENE_NAME [GENE_NAME ...]] 
-                              [--run_profiler]
-                              DIR TSV
+                              [--threads INTEGER] [--run_profiler]
+                              [--linearise_gene GENE_NAME [GENE_NAME ...]]
+                              GENOME_FASTA_DIR METADATA_TSV CHLOE_PROJECT_DIR
 
 options:
   -h, --help            show this help message and exit
 
 Required input:
-  DIR                   Directory containing plastid DNA FASTA files.
-  TSV                   TSV file containing sample metadata for EMBL
-                        conversion. File should contain columns:
+  GENOME_FASTA_DIR      Directory containing plastid DNA FASTA files.
+  METADATA_TSV          TSV file containing sample metadata for EMBL
+                        conversion. Required file should contain columns:
                         input_filename, project_id, locus_tag, genus_species,
-                        linear_or_circular. Only input_filename and linear_or_circular 
-                        require values; empty optional fields will use defaults.
+                        linear_or_circular. ALL samples must be listed. Only
+                        input_filename and linear_or_circular require values;
+                        empty optional fields will use defaults.
                         linear_or_circular must be "linear" or "circular".
+  CHLOE_PROJECT_DIR     Path to the Chloë project directory; chloe.jl is
+                        expected at <DIR>/chloe.jl
 
-Optional input:
-  --chloe_project_dir DIR, -chloe_proj DIR
-                        Path to the chloe project directory to use as
-                        --project for Julia. Must be provided together with
-                        --chloe_script.
-  --chloe_script PATH, -chloe_jl PATH
-                        Path to the chloe.jl script. Must be provided together
-                        with --chloe_project_dir.
+General pipeline options:
   --linearise_gene GENE_NAME [GENE_NAME ...]
                         Gene(s) to use for genome linearisation. Can specify multiple genes.
                         Genes will be tried in order until one is found. Default is: ['psbA']
@@ -456,7 +460,9 @@ output_dir/
 ├── 00_logs_and_reports/
 │   ├── logs/
 │   │   └── db_for_intgen_<timestamp>.log                # Runtime log
-└── 01_intgen_db/
+│   └── reports/
+│       └── extracted_features_report.tsv                # Detailed report of extracted features
+└── 01_intgen_db/                                        # BLAST database directory
     ├── intgen_db.nhr                                    # BLAST database header file
     ├── intgen_db.nin                                    # BLAST database index file
     ├── intgen_db.nsq                                    # BLAST database sequence file
@@ -537,9 +543,15 @@ output_dir/
 - Extracts taxonomic information directly from GenBank file annotations
 - Handles cases where taxonomic information is incomplete
 
-#### 4. BLAST database creation
+#### 4. BLAST database creation and reporting
 - Writes extracted features to a temporary FASTA file
 - Creates a nucleotide BLAST database using `makeblastdb`
+- Generates a comprehensive TSV report (`extracted_features_report.tsv`) containing:
+  - Feature identifiers and sequence lengths
+  - Feature types (CDS, rRNA, tRNA, etc.)
+  - Gene names and product descriptions
+  - Taxonomic classification (Order, Family, Genus, Species)
+  - Source file information
 
 ## Linearization
 
@@ -576,7 +588,6 @@ Example [`metadata.tsv`](https://github.com/chrisjackson-pellicle/PAV/blob/main/
 | sample2.fasta  | PRJEB98765 | XYZ       | Oryza sativa | linear |
 | sample3.fasta  |            |           |               | circular |
 | sample4.fasta  | PRJEB11111 |           | Zea mays | circular |
-
 
 Notes:
 - **Required fields**: `input_filename` and `linear_or_circular` must have values when running `pav annotate_and_check`
@@ -736,9 +747,19 @@ For issues and questions:
 
 ## Changelog
 
-### Version 0.0.1
-- Initial release
-- Genome annotation with Chloë
-- Reference-based validation
-- Alignment generation
-- Quality assessment and reporting
+### Version 1.0.0
+
+- Optional parameters `--chloe_project_dir` and `--chloe_project_name` have been removed. PAV now expects the path to the Chloe project directory as a required positional argument to `pav annotate_and_check`. PAV no longer checks for the Chloe project directory in $CONDA_PREFIX/bin.
+- Added path resolution for the PAV data directory, as setup for a conda package install.   
+
+### Version 0.0.1 (Initial Release)
+- **Initial release** with plastid genome annotation and validation functions
+- **Genome annotation** with Chloë integration
+- **Reference-based validation** against multiple taxonomic orders
+- **Alignment generation** for CDS, rRNA, and tRNA genes
+- **Quality assessment** with gene length checking and translation validation
+- **EMBL/ENA template generation** for sequence submission
+- **Intergenic region analysis** with BLAST database support
+- **Multi-sequence FASTA support** for fragmented assemblies
+- **Parallel processing** for improved performance
+- **Comprehensive reporting** and logging system

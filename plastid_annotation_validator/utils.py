@@ -17,7 +17,6 @@ import time
 import gzip
 
 
-
 class LogManager:
     """Global log manager that handles automatic cleanup."""
     
@@ -343,11 +342,14 @@ def print_arguments(args, logger, __version__):
     logger.info('')
 
 
-def check_dependencies(logger, entry='main'):
+def check_dependencies(args, logger, entry='main'):
     """Checks for the presence of required external executables.
 
     Args:
-        Nil.
+        args (argparse.Namespace): Parsed command line arguments containing input file paths
+            and other configuration options.
+        logger (logging.Logger): Logger object.
+        entry (str): The entry point of the script.
 
     Returns:
         bool: True if all dependencies are found, False otherwise.
@@ -369,6 +371,22 @@ def check_dependencies(logger, entry='main'):
         else:
             logger.info(f'{"":15} {executable:20} not found in your $PATH!')
             all_executables_found = False
+
+    if entry == 'main':
+        if args.chloe_project_dir:
+            chloe_script = os.path.join(args.chloe_project_dir, 'chloe.jl')
+
+            if not os.path.isdir(args.chloe_project_dir):
+                logger.info(f'{"":15} {"chloe project":20} not found at {args.chloe_project_dir}!')
+                all_executables_found = False
+            else:
+                logger.info(f'{"":15} {"chloe project":20} found at {args.chloe_project_dir}')
+
+            if not os.path.exists(chloe_script):
+                logger.info(f'{"":15} {"chloe.jl":20} not found at {chloe_script}!')
+                all_executables_found = False
+            else:
+                logger.info(f'{"":15} {"chloe.jl":20} found at {chloe_script}')
 
     logger.info('')
 
@@ -695,4 +713,20 @@ def setup_log_and_report_directories(args):
     createfolder(log_directory)
     createfolder(report_directory)
     args.log_directory = log_directory
-    args.report_directory = report_directory 
+    args.report_directory = report_directory
+
+    
+def resolve_data_dir_base():
+    """Resolve and return the base data directory for PAV resources.
+
+    Order of preference:
+    1) $CONDA_PREFIX/share/PAV/data when CONDA_PREFIX is set and the directory exists
+    2) Package data directory at plastid_annotation_validator/data (next to this file)
+
+    Returns:
+        str: Absolute path to the resolved base data directory.
+    """
+    conda_prefix = os.environ.get('CONDA_PREFIX')
+    conda_data_dir = os.path.join(conda_prefix, 'share', 'PAV', 'data') if conda_prefix else None
+    pkg_data_dir = os.path.join(os.path.dirname(__file__), 'data')
+    return conda_data_dir if (conda_data_dir and os.path.exists(conda_data_dir)) else pkg_data_dir 

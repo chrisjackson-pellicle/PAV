@@ -64,7 +64,7 @@ logger = None
 log_queue = None
 log_listener = None
 
-def load_gene_synonyms():
+def load_gene_synonyms(data_dir_base=None):
     """
     Load gene synonyms from the package text file.
     
@@ -76,15 +76,21 @@ def load_gene_synonyms():
         
     """
 
-    with importlib.resources.open_text('plastid_annotation_validator.data', 'gene_synonyms.txt') as synonyms_file:
-        gene_synonyms = {}
-        
+    # Require provided data_dir_base and do not fall back
+    if data_dir_base is None:
+        raise ValueError("data_dir_base must be provided to load_gene_synonyms()")
+    candidate_path = os.path.join(data_dir_base, 'gene_synonyms.txt')
+    if not os.path.exists(candidate_path):
+        raise FileNotFoundError(f"Gene synonyms file not found at: {candidate_path}")
+    
+    gene_synonyms = {}
+    with open(candidate_path, 'r') as synonyms_file:
         for line in synonyms_file:
             line = line.strip()
             # Skip empty lines and comments
             if not line or line.startswith('#'):
                 continue
-            
+
             # Parse the mapping: "GenBank_name -> Standard_name"
             if ' = ' in line:
                 genbank_name, standard_name = line.split(' = ', 1)
@@ -95,7 +101,7 @@ def load_gene_synonyms():
     return gene_synonyms
         
 
-def load_gene_median_lengths():
+def load_gene_median_lengths(data_dir_base=None):
     """ 
     Load gene median lengths from the package CSV file.
     
@@ -107,8 +113,15 @@ def load_gene_median_lengths():
         
     """
 
-    with importlib.resources.open_text('plastid_annotation_validator.data',
-                                       'plDNA_genes_median_lengths.csv') as csv_file:
+    # Require provided data_dir_base and do not fall back
+    if data_dir_base is None:
+        raise ValueError("data_dir_base must be provided to load_gene_median_lengths()")
+
+    candidate_path = os.path.join(data_dir_base, 'plDNA_genes_median_lengths.csv')
+    if not os.path.exists(candidate_path):
+        raise FileNotFoundError(f"Median lengths CSV not found at: {candidate_path}")
+
+    with open(candidate_path, 'r') as csv_file:
         gene_lengths_df = pd.read_csv(csv_file)
 
     if logger:
@@ -117,9 +130,9 @@ def load_gene_median_lengths():
     
     # Convert to dictionary for easier access
     gene_median_lengths = dict(zip(gene_lengths_df['Key'], gene_lengths_df['Value']))
-    
     if logger:
         logger.debug(f"{"[DEBUG]:":10} Loaded {len(gene_median_lengths)} gene median lengths")
+    
     
     return gene_median_lengths
 
@@ -892,7 +905,7 @@ def write_gene_length_report(all_results, logger, min_threshold, max_threshold, 
         f.write('\n'.join(combined_tsv_lines))
 
 
-def get_references(args, gene_median_lengths, gene_synonyms=None):
+def get_references(args, gene_median_lengths, gene_synonyms=None, data_dir_base=None):
     """
     Check alignment settings and get reference sequences from appropriate sources.
     
@@ -910,6 +923,10 @@ def get_references(args, gene_median_lengths, gene_synonyms=None):
     default_refs = None
     custom_refs = None
     
+    # Require provided data_dir_base and do not fall back
+    if data_dir_base is None:
+        raise ValueError("data_dir_base must be provided to get_references()")
+
     # Check if refs_order contains entries
     if args.refs_order:
         # If refs_order is specified, no_alignment must be False
@@ -918,9 +935,8 @@ def get_references(args, gene_median_lengths, gene_synonyms=None):
                          f"--no_alignment or remove --refs_order.")
             utils.exit_program()
         
-        # Get available order directories
-        data_dir = os.path.join(os.path.dirname(__file__), 'data')
-        order_genomes_dir = os.path.join(data_dir, 'order_genomes')
+        # Get available order directories under the resolved base data directory
+        order_genomes_dir = os.path.join(data_dir_base, 'order_genomes')
         
         if not os.path.exists(order_genomes_dir):
             logger.error(f"Order genomes directory not found: {order_genomes_dir}")
@@ -943,7 +959,9 @@ def get_references(args, gene_median_lengths, gene_synonyms=None):
         
         # Get reference sequences from order-specific directories
         logger.info(f"{"[INFO]:":10} Using reference genomes from orders: {args.refs_order}")
-        order_refs = get_ref_gene_seqrecords_from_orders(args.refs_order, gene_median_lengths, gene_synonyms)
+        order_refs = get_ref_gene_seqrecords_from_orders(
+            args.refs_order, gene_median_lengths, gene_synonyms, data_dir_base=data_dir_base
+        )
     
     # Check if custom reference folder is specified
     if args.custom_refs_folder:
@@ -964,7 +982,8 @@ def get_references(args, gene_median_lengths, gene_synonyms=None):
     # If no specific references are specified, use default reference genomes
     if not args.refs_order and not args.custom_refs_folder:
         logger.info(f"{"[INFO]:":10} Using default reference genomes from data/reference_genomes_default")
-        default_refs = get_ref_gene_seqrecords_from_default(gene_median_lengths, gene_synonyms)
+        default_refs = get_ref_gene_seqrecords_from_default(gene_median_lengths, gene_synonyms, 
+                                                            data_dir_base=data_dir_base)
     
     # Merge all reference sources
     merged_refs = merge_reference_sequences(order_refs, default_refs, custom_refs)
@@ -1033,7 +1052,7 @@ def extract_taxonomic_info(record, order_name=None):
     return order, family, genus, species
 
 
-def get_ref_gene_seqrecords_from_orders(orders, gene_median_lengths, gene_synonyms=None):
+def get_ref_gene_seqrecords_from_orders(orders, gene_median_lengths, gene_synonyms=None, data_dir_base=None):
     """
     Extract CDS, rRNA, and tRNA sequences from GenBank files in order-specific directories.
     
@@ -1059,14 +1078,14 @@ def get_ref_gene_seqrecords_from_orders(orders, gene_median_lengths, gene_synony
     if gene_synonyms is None:
         gene_synonyms = {}
 
-    # Get path to the order genomes data directory
-    data_dir = os.path.join(os.path.dirname(__file__), 'data', 'order_genomes')
+    # Get path to the order genomes data directory using base data dir 
+    order_genomes_dir = os.path.join(data_dir_base, 'order_genomes')
     
     # Track gene copies per file for ID generation
     gene_copy_counts = {}  # (mapped_gene_name, gbk_file) -> copy_count
     
     for order in orders:
-        order_dir = os.path.join(data_dir, order)
+        order_dir = os.path.join(order_genomes_dir, order)
         gbk_files = glob.glob(os.path.join(order_dir, '*.gb*'))
         
         logger.debug(f"{"[DEBUG]:":10} Found {len(gbk_files)} GenBank files in {order} directory")
@@ -1301,7 +1320,7 @@ def get_ref_gene_seqrecords_from_custom_folder(refs_folder, gene_median_lengths,
     return ref_cds_seqrecords
 
 
-def get_ref_gene_seqrecords_from_default(gene_median_lengths, gene_synonyms=None):
+def get_ref_gene_seqrecords_from_default(gene_median_lengths, gene_synonyms=None, data_dir_base=None):
     """
     Extract CDS, rRNA, and tRNA sequences from GenBank files in the default reference directory.
     
@@ -1326,12 +1345,12 @@ def get_ref_gene_seqrecords_from_default(gene_median_lengths, gene_synonyms=None
     if gene_synonyms is None:
         gene_synonyms = {}
 
-    # Get path to the default reference genomes directory
-    data_dir = os.path.join(os.path.dirname(__file__), 'data', 'reference_genomes_default')
+    # Get path to the default reference genomes directory using base data dir
+    ref_geneome_dir = os.path.join(data_dir_base, 'reference_genomes_default')
     
     # Track gene copies per file for ID generation
     gene_copy_counts = {}  # (mapped_gene_name, gbk_file) -> copy_count
-    gbk_files = glob.glob(os.path.join(data_dir, '*.gb*'))
+    gbk_files = glob.glob(os.path.join(ref_geneome_dir, '*.gb*'))
     
     logger.debug(f"{"[DEBUG]:":10} Found {len(gbk_files)} GenBank files in default reference data directory")
     
@@ -2403,7 +2422,7 @@ def linearise_genome_upstream_gene(gbk_file, fasta_file, output_dir, sample_name
         return fasta_file
 
 
-def process_single_sequence(fasta_file, output_dir, sequence_name, chloe_project_dir, chloe_script_path, linearise_genes, 
+def process_single_sequence(fasta_file, output_dir, sequence_name, chloe_project_dir, linearise_genes, 
                             metadata_dict, original_fasta_name, logger=None):
     """
     Process a single sequence file with Chloë annotation.
@@ -2451,28 +2470,9 @@ def process_single_sequence(fasta_file, output_dir, sequence_name, chloe_project
     else:
         logger.debug(f"{"[INFO]:":10} {sequence_name} needs initial annotation")
 
-    # Resolve chloe project and script paths
-    if (chloe_project_dir is None) != (chloe_script_path is None):
-        logger.error(f"{"[ERROR]:":10} Both --chloe_project_dir and --chloe_script must be provided together.")
-        utils.exit_program()
-
-    if chloe_project_dir and chloe_script_path:
-        chloe_project = f'--project={chloe_project_dir}'
-        chloe_script = chloe_script_path
-    else:
-        try:
-            conda_prefix = os.environ['CONDA_PREFIX']
-        except KeyError:
-            conda_prefix = None
-
-        if not conda_prefix:
-            if logger:
-                logger.error(f"{"[ERROR]:":10} Cannot locate chloe project/script without CONDA_PREFIX or user-specified paths")
-            utils.exit_program()
-
-        chloe_project = f'--project={conda_prefix}/bin/chloe'
-        chloe_script = f'{conda_prefix}/bin/chloe/chloe.jl'
-
+    chloe_project = f'--project={chloe_project_dir}'
+    chloe_script = os.path.join(chloe_project_dir, 'chloe.jl')
+    
     # Run chloe annotate command
     cmd = [
         'julia',
@@ -2569,7 +2569,7 @@ def process_single_sequence(fasta_file, output_dir, sequence_name, chloe_project
         }
 
 
-def annotate_genomes(genome_fasta_dir, output_directory, chloe_project_dir=None, chloe_script_path=None,
+def annotate_genomes(genome_fasta_dir, output_directory, chloe_project_dir,
                      linearise_genes=['psbA'],  metadata_dict=None, pool_size=1, log_queue=None):
     """
     Annotate genome fasta files using chloe annotate command.
@@ -2578,7 +2578,6 @@ def annotate_genomes(genome_fasta_dir, output_directory, chloe_project_dir=None,
         genome_fasta_dir (str): Path to directory containing genome fasta files
         output_directory (str): Path to directory to write annotated genomes
         chloe_project_dir (str, optional): Path to the chloe project directory
-        chloe_script_path (str, optional): Path to the chloe.jl script
         linearise_genes (list, optional): List of genes to try for linearisation (default: ['psbA'])
         metadata_dict (dict, optional): Metadata dictionary mapping fasta filenames to metadata.
                                       Used to check linear_or_circular status to skip linearisation
@@ -2627,7 +2626,7 @@ def annotate_genomes(genome_fasta_dir, output_directory, chloe_project_dir=None,
         # Submit all tasks
         future_to_file = {
             executor.submit(process_single_fasta_file, fasta_file, annotated_genomes_dir, chloe_project_dir,
-                            chloe_script_path, linearise_genes, metadata_dict, log_queue): fasta_file
+                            linearise_genes, metadata_dict, log_queue): fasta_file
             for fasta_file in fasta_files
         }
         
@@ -2651,7 +2650,7 @@ def annotate_genomes(genome_fasta_dir, output_directory, chloe_project_dir=None,
     return annotated_genomes
 
 
-def process_single_fasta_file(fasta_file, annotated_genomes_dir, chloe_project_dir, chloe_script_path, linearise_genes,
+def process_single_fasta_file(fasta_file, annotated_genomes_dir, chloe_project_dir, linearise_genes,
                               metadata_dict, log_queue=None):
     """
     Process a single FASTA file with annotation (worker function for multiprocessing).
@@ -2718,7 +2717,6 @@ def process_single_fasta_file(fasta_file, annotated_genomes_dir, chloe_project_d
                     output_sample_dir, 
                     seq_name, 
                     chloe_project_dir, 
-                    chloe_script_path, 
                     linearise_genes, 
                     metadata_dict, 
                     input_basename,  # Original multi-sequence filename for metadata lookup
@@ -2734,17 +2732,14 @@ def process_single_fasta_file(fasta_file, annotated_genomes_dir, chloe_project_d
                 # Store all individual sequence files
                 all_gbk_files = []
                 all_gff_files = []
-                # all_fasta_files = []
                 
                 for seq_name, seq_result in sample_data['sequences'].items():
                     all_gbk_files.append(seq_result['gbk'])
                     all_gff_files.append(seq_result['gff'])
-                    # all_fasta_files.append(seq_result['fasta'])
                 
                 # Store all files in the main dictionary
                 sample_data['gbk'] = all_gbk_files
                 sample_data['gff'] = all_gff_files
-                # sample_data['fasta'] = all_fasta_files
             
             return True, (filename_prefix_no_dots, sample_data)
         
@@ -2765,7 +2760,6 @@ def process_single_fasta_file(fasta_file, annotated_genomes_dir, chloe_project_d
                 os.path.join(annotated_genomes_dir, filename_prefix_no_dots), 
                 filename_prefix, 
                 chloe_project_dir, 
-                chloe_script_path, 
                 linearise_genes, 
                 metadata_dict, 
                 input_basename,
@@ -4245,16 +4239,19 @@ def check_pipeline(args):
         utils.print_arguments(args, logger, __version__)
 
         # Check for external dependencies:
-        utils.check_dependencies(logger, entry='check')
+        utils.check_dependencies(args, logger, entry='check')
 
-        # Load gene median lengths from package resources
-        gene_median_lengths = load_gene_median_lengths()
+        # Resolve base data directory after dependency check
+        data_dir_base = utils.resolve_data_dir_base()
 
-        # Load gene synonyms from package resources
-        gene_synonyms = load_gene_synonyms()
+        # Load gene median lengths from resolved data directory
+        gene_median_lengths = load_gene_median_lengths(data_dir_base=data_dir_base)
+
+        # Load gene synonyms from resolved data directory
+        gene_synonyms = load_gene_synonyms(data_dir_base=data_dir_base)
 
         # Check no_alignment and refs_order
-        ref_gene_seqrecords = get_references(args, gene_median_lengths, gene_synonyms)
+        ref_gene_seqrecords = get_references(args, gene_median_lengths, gene_synonyms, data_dir_base=data_dir_base)
 
         # Parse required metadata TSV file
         if args.metadata_tsv:
@@ -4340,16 +4337,19 @@ def main(args):
         utils.print_arguments(args, logger, __version__)
 
         # Check for external dependencies:
-        utils.check_dependencies(logger)
+        utils.check_dependencies(args, logger)
 
-        # Load gene median lengths from package resources
-        gene_median_lengths = load_gene_median_lengths()
+        # Resolve base data directory after dependency check
+        data_dir_base = utils.resolve_data_dir_base()
 
-        # Load gene synonyms from package resources
-        gene_synonyms = load_gene_synonyms()
+        # Load gene median lengths from resolved data directory
+        gene_median_lengths = load_gene_median_lengths(data_dir_base=data_dir_base)
+
+        # Load gene synonyms from resolved data directory
+        gene_synonyms = load_gene_synonyms(data_dir_base=data_dir_base)
 
         # Check no_alignment and refs_order
-        ref_gene_seqrecords = get_references(args, gene_median_lengths, gene_synonyms)
+        ref_gene_seqrecords = get_references(args, gene_median_lengths, gene_synonyms, data_dir_base=data_dir_base)
 
         # Parse required metadata TSV file
         metadata_dict = parse_metadata_tsv(args.metadata_tsv, args.genome_fasta_dir)
@@ -4357,12 +4357,11 @@ def main(args):
         # Validate linearisation genes against gene_synonyms.txt
         validated_linearise_genes = validate_linearisation_genes(args.linearise_gene, gene_synonyms, logger)
 
-        # Annotate the genomes using chloë, honouring optional user-specified chloe paths
+        # Annotate the genomes using chloë (project dir required)
         annotated_genomes_dict = annotate_genomes(
             args.genome_fasta_dir,
             args.output_directory,
             args.chloe_project_dir,
-            args.chloe_script,
             validated_linearise_genes,
             metadata_dict,
             args.pool,

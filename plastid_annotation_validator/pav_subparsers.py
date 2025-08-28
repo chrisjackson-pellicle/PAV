@@ -114,19 +114,15 @@ def _add_general_options_group(parser, include_chloe=True):
                                  dest='threads',
                                  help='The number of threads to use for the subcommand. Default is: %(default)s')
     
+    optional_group_general.add_argument('--run_profiler',
+                              action='store_true',
+                              dest='run_profiler',
+                              default=False,
+                              help='If supplied, run the subcommand using cProfile. Saves a *.csv file of results. '
+                                   'Default is: %(default)s')
+    
     if include_chloe:
-        optional_group_general.add_argument('--chloe_project_dir', '-chloe_proj',
-                                 type=str,
-                                 default=None,
-                                 metavar='DIR',
-                                 dest='chloe_project_dir',
-                                 help='Path to the chloe project directory to use as --project for Julia. Must be provided together with --chloe_script.')
-        optional_group_general.add_argument('--chloe_script', '-chloe_jl',
-                                 type=str,
-                                 default=None,
-                                 metavar='PATH',
-                                 dest='chloe_script',
-                                 help='Path to the chloe.jl script. Must be provided together with --chloe_project_dir.')
+
         optional_group_general.add_argument('--linearise_gene',
                                  type=str,
                                  nargs='+',
@@ -135,13 +131,6 @@ def _add_general_options_group(parser, include_chloe=True):
                                  help='Gene(s) to use for genome linearisation. Can specify multiple genes. '
                                       'Genes will be tried in order until one is found. Default is: %(default)s')
     
-    optional_group_general.add_argument('--run_profiler',
-                              action='store_true',
-                              dest='run_profiler',
-                              default=False,
-                              help='If supplied, run the subcommand using cProfile. Saves a *.csv file of results. '
-                                   'Default is: %(default)s')
-
 
 def annotate_and_check_parser(subparsers):
     """
@@ -157,15 +146,19 @@ def annotate_and_check_parser(subparsers):
     required_positional_group = parser_annotate_and_check.add_argument_group('Required input')
     
     required_positional_group.add_argument('genome_fasta_dir',
-                                metavar='DIR',
+                                metavar='GENOME_FASTA_DIR',
                                 help='Directory containing plastid DNA FASTA files.')
     
     required_positional_group.add_argument('metadata_tsv',
-                                metavar='TSV',
+                                metavar='METADATA_TSV',
                                 help='TSV file containing sample metadata for EMBL conversion. Required file should contain columns: '
                                 'input_filename, project_id, locus_tag, genus_species, linear_or_circular. '
                                 'ALL samples must be listed. Only input_filename and linear_or_circular require values; '
                                 'empty optional fields will use defaults. linear_or_circular must be "linear" or "circular".')
+
+    required_positional_group.add_argument('chloe_project_dir',
+                                metavar='CHLOE_PROJECT_DIR',
+                                help='Path to the Chloë project directory; chloe.jl is expected at <DIR>/chloe.jl')
 
     # Add all argument groups using helper functions
     _add_gene_length_warnings_group(parser_annotate_and_check)
@@ -191,13 +184,13 @@ def check_parser(subparsers):
     required_positional_group = parser_check.add_argument_group('Required input')
     
     required_positional_group.add_argument('annotated_genbank_dir',
-                                metavar='DIR',
+                                metavar='ANNOTATED_GENBANK_DIR',
                                 help='Directory containing already annotated GenBank files.')
     
     # Add optional arguments
     optional_group_general = parser_check.add_argument_group('Optional input')
     optional_group_general.add_argument('--metadata_tsv',
-                                metavar='TSV',
+                                metavar='METADATA_TSV',
                                 default=None,
                                 help='TSV file containing sample metadata for EMBL conversion. If not provided, samples '
                                 'will be processed without metadata.')
@@ -226,7 +219,7 @@ def db_for_intgen_parser(subparsers):
     required_positional_group = parser_db_for_intgen.add_argument_group('Required input')
     
     required_positional_group.add_argument('input_dir',
-                                metavar='DIR',
+                                metavar='INPUT_DIR',
                                 help='Input directory containing GenBank files (.gb, .gbk, .gb.gz, or .gbk.gz)')
     
     ####################################################################################################################

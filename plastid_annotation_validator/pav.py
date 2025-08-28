@@ -72,7 +72,7 @@ import os
 import plastid_annotation_validator.utils as utils
 import plastid_annotation_validator.annotate_and_check as annotate_and_check
 import plastid_annotation_validator.pav_subparsers as pav_subparsers
-import plastid_annotation_validator.db_for_integen as db_for_integen
+import plastid_annotation_validator.db_for_intgen as db_for_intgen
 from plastid_annotation_validator.version import __version__
 
 
@@ -116,9 +116,9 @@ def check_main(args):
 
 def db_for_intgen_main(args):
     """
-    Calls the function main() from module db_for_integen
+    Calls the function main() from module db_for_intgen
 
-    :param args: argparse namespace with subparser options for function db_for_integen.main()
+    :param args: argparse namespace with subparser options for function db_for_intgen.main()
     :return: None: no return value specified; default is None
     """
 
@@ -129,8 +129,8 @@ def db_for_intgen_main(args):
 
     args.subcommand_name = subcommand_name
 
-    # Run main() from module db_for_integen.py
-    db_for_integen.main(args)
+    # Run main() from module db_for_intgen.py
+    db_for_intgen.main(args)
 
 
 def parse_arguments():
