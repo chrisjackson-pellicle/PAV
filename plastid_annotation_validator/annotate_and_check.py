@@ -4535,7 +4535,7 @@ def main(args):
             utils.log_separator(logger)
             utils.log_completion_time(start_time, logger, label="PAV subcommand `annotate_and_check` INTERRUPTED")
         
-        print("\nCleaning up processes and exiting...")
+        print(f"\n{" ":10} Cleaning up processes and exiting...")
         utils.log_manager.cleanup()
         sys.exit(0)
         
