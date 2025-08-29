@@ -33,7 +33,7 @@ PAV processes plastid genome assemblies, performs annotation using [Chloë](http
 
 ## Installation
 
-You can install PAV with **most** dependencies with conda:
+You can install PAV with **most** dependencies using conda:
    ```bash
    conda create --name pav
    conda activate pav  
@@ -117,6 +117,7 @@ Alternatively, you can install everything manually, as below.
 pav annotate_and_check \
   /path/to/fasta/files \
   /path/to/metadata.tsv \
+  /path/to/chloe \
   --output_directory /path/to/output
 ```
 
@@ -268,7 +269,8 @@ General pipeline options:
 ```bash
 pav annotate_and_check \
   genomes/ \
-  metadata.tsv
+  metadata.tsv \
+  chloe_project_dir
 ```
 
 #### Continue from annotated GenBank files:
@@ -289,6 +291,7 @@ pav check \
 pav annotate_and_check \
   genomes/ \
   metadata.tsv \
+  chloe_project_dir \
   --refs_order Alismatales Poales Arecales
 ```
 
@@ -297,6 +300,7 @@ pav annotate_and_check \
 pav annotate_and_check \
   genomes/ \
   metadata.tsv \
+  chloe_project_dir \
   --custom_refs_folder /path/to/custom/references/
 ```
 
@@ -305,6 +309,7 @@ pav annotate_and_check \
 pav annotate_and_check \
   genomes/ \
   metadata.tsv \
+  chloe_project_dir \
   --refs_order Alismatales \
   --custom_refs_folder /path/to/custom/references/
 ```
@@ -314,6 +319,7 @@ pav annotate_and_check \
 pav annotate_and_check \
   genomes/ \
   metadata.tsv \
+  chloe_project_dir \
   --no_alignment
 ```
 
@@ -323,18 +329,21 @@ pav annotate_and_check \
 pav annotate_and_check \
   genomes/ \
   metadata.tsv \
+  chloe_project_dir \
   --linearise_gene psbA
 
 # Multiple genes (tried in order until one is found)
 pav annotate_and_check \
   genomes/ \
   metadata.tsv \
+  chloe_project_dir \
   --linearise_gene psbA rbcL matK
 
 # Mixed case (handles gene name mapping)
 pav annotate_and_check \
   genomes/ \
   metadata.tsv \
+  chloe_project_dir \
   --linearise_gene ATPA psbA rbcL
 ```
 
@@ -344,12 +353,14 @@ pav annotate_and_check \
 pav annotate_and_check \
   genomes/ \
   metadata.tsv \
+  chloe_project_dir \
   --custom_blast_db /path/to/blastdb/directory/
 
 # Using a direct path to the BLAST database
 pav annotate_and_check \
   genomes/ \
   metadata.tsv \
+  chloe_project_dir \
   --custom_blast_db /path/to/blastdb/directory/custom_db
 ```
 
@@ -358,6 +369,7 @@ pav annotate_and_check \
 pav annotate_and_check \
   genomes/ \
   metadata.tsv \
+  chloe_project_dir \
   --output_directory results/ \
   --refs_order Alismatales \
   --min_length_percentage 0.9 \
@@ -391,6 +403,7 @@ pav db_for_intgen \
 pav annotate_and_check \
   genomes/ \
   metadata.tsv \
+  chloe_project_dir \
   --custom_blast_db custom_blastdb/01_intgen_db/
 
 # Or with the check subcommand
