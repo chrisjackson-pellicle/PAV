@@ -33,6 +33,20 @@ PAV processes plastid genome assemblies, performs annotation using [Chloë](http
 
 ## Installation
 
+You can install PAV with **most** dependencies with conda:
+   ```bash
+   conda create --name pav
+   conda activate pav  
+   conda install chrisjackson-pellicle::pav
+   ```
+
+> [!IMPORTANT]
+> You will still need to install Julia and Chloë separately, see steps 3 and 4 below.
+>
+> This is because I can't get Chloë to instantiate with a conda installation of Julia during conda package build (yet) - Julia core dump, possible SSL issue, etc.  
+
+Alternatively, you can install everything manually, as below.
+
 ### Prerequisites
 
 - Python 3.7+
