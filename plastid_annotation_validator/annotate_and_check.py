@@ -2,37 +2,19 @@
 """
 Plastid Annotation Validator (PAV) - Annotation and Validation Module
 
-This module provides comprehensive functionality for annotating plastid genomes and validating
-their gene annotations against reference data. It serves as the core processing engine for the
-PAV pipeline, handling genome annotation, gene validation, alignment generation, and intergenic
-region analysis.
+This module provides comprehensive functionality for annotating and validating
+plastid genome annotations. It includes:
 
-Main Functions:
-    - annotate_genomes(): Annotates plastid genomes using the chloë annotation pipeline
-    - check_genes(): Validates gene annotations against reference median lengths and synonyms
-    - align_genes(): Generates multiple sequence alignments for annotated genes
-    - query_intergenic_regions(): Performs BLAST analysis of intergenic regions
-    - convert_gbk_to_embl(): Converts GenBank files to EMBL format with locus tags
+- annotate_genomes(): Annotates plastid genomes using Chloë
+- check_genes(): Validates gene annotations against reference data
+- convert_gbk_to_embl(): Converts GenBank files to EMBL format
+- align_genes(): Generates multiple sequence alignments
+- query_intergenic_regions(): Performs BLAST analysis of intergenic regions
 
-Key Features:
-    - Multi-process parallel processing for improved performance
-    - Comprehensive logging with queue-based multiprocessing support
-    - Gene synonym mapping for standardized gene naming
-    - Length validation against reference median values
-    - Multiple alignment formats (CDS, rRNA, per-gene)
-    - Intergenic region extraction and BLAST analysis
-    - Robust error handling and cleanup
-
-Dependencies:
-    - Biopython: Sequence parsing and manipulation
-    - chloë: Genome annotation pipeline
-    - MAFFT: Multiple sequence alignment
-    - BLAST+: Sequence similarity search
-    - TrimAl: Alignment trimming
-
-Usage:
-    This module is typically called through the PAV command-line interface:
-    $ pav annotate_and_check [options]
+The module supports both single and multi-sequence FASTA files per sample,
+with the latter allowing for fragmented assemblies. It uses multiprocessing
+for efficient parallel processing and provides comprehensive logging and
+error handling.
 
 Author: Chris Jackson chris.jackson@rbg.vic.gov.au
 License: See LICENSE file
@@ -40,6 +22,14 @@ License: See LICENSE file
 
 import os
 import sys
+import multiprocessing
+
+# Linux-specific multiprocessing configuration to prevent freezing
+if sys.platform.startswith('linux'):
+    # Use 'spawn' method on Linux to avoid issues with fork
+    multiprocessing.set_start_method('spawn', force=True)
+    multiprocessing.set_executable(sys.executable)
+    
 from collections import defaultdict
 from Bio import SeqIO
 from Bio.SeqRecord import SeqRecord
@@ -66,14 +56,24 @@ log_listener = None
 
 def load_gene_synonyms(data_dir_base=None):
     """
-    Load gene synonyms from the package text file.
+    Load gene synonyms from the package text file for gene name standardization.
+    
+    This function reads the gene_synonyms.txt file which contains mappings between
+    different gene name variations (e.g., 'ycf3' -> 'pafI', 'psbN' -> 'pbf1') to
+    ensure consistent gene naming across different annotation sources.
     
     Args:
-        None
-
+        data_dir_base (str, optional): Base directory containing PAV data files.
+            If None, will raise ValueError.
+    
     Returns:
-        dict: Dictionary mapping gene names to their standardized synonyms
-        
+        dict: Dictionary mapping gene names to their standardized synonyms.
+            Keys are GenBank-style names, values are standardized names.
+    
+    Raises:
+        ValueError: If data_dir_base is None
+        FileNotFoundError: If gene_synonyms.txt file is not found at the specified path
+    
     """
 
     # Require provided data_dir_base and do not fall back
@@ -102,15 +102,25 @@ def load_gene_synonyms(data_dir_base=None):
         
 
 def load_gene_median_lengths(data_dir_base=None):
-    """ 
-    Load gene median lengths from the package CSV file.
+    """
+    Load gene median lengths from the package CSV file for validation.
+    
+    This function reads the plDNA_genes_median_lengths.csv file which contains
+    reference median lengths for plastid genes. These values are used to validate
+    gene annotations by comparing observed gene lengths against expected ranges.
     
     Args:
-        logger: Logger instance for logging messages
-
+        data_dir_base (str, optional): Base directory containing PAV data files.
+            If None, will raise ValueError.
+    
     Returns:
-        dict: Dictionary mapping gene names to their median lengths
-        
+        dict: Dictionary mapping gene names to their median lengths.
+            Keys are standardized gene names, values are integer lengths in base pairs.
+    
+    Raises:
+        ValueError: If data_dir_base is None
+        FileNotFoundError: If plDNA_genes_median_lengths.csv file is not found at the specified path
+    
     """
 
     # Require provided data_dir_base and do not fall back
@@ -139,44 +149,54 @@ def load_gene_median_lengths(data_dir_base=None):
 
 def parse_gbk_genes(gbk_file_path, logger, gene_synonyms=None):
     """
-    Parse gene annotations from a GenBank file and extract gene lengths, CDS, rRNA, and tRNA information.
+    Parse gene annotations from a GenBank file and extract comprehensive gene information.
     
-    This function processes a GenBank file to extract comprehensive gene annotation information:
-    1. Parses CDS, rRNA, and tRNA features from the GenBank file
-    2. Extracts gene names and applies synonym mapping for standardization
-    3. Creates individual entries for each gene copy with appropriate suffixes
-    4. Extracts sequence information for translation validation
-    5. Organizes information into structured dictionaries for downstream analysis
+    This function processes a GenBank file to extract detailed gene annotation information
+    for validation and analysis. It handles multiple gene copies, applies gene name
+    standardization, and organizes data for downstream processing.
+    
+    The function processes three main gene types:
+    1. CDS (Coding Sequences): Protein-coding genes with translation validation
+    2. rRNA (Ribosomal RNA): Ribosomal RNA genes
+    3. tRNA (Transfer RNA): Transfer RNA genes
     
     Args:
-        gbk_file_path (str): Path to the GenBank file (.gb or .gbk)
-        logger: Logger instance for logging messages and debugging
+        gbk_file_path (str): Path to the GenBank file (.gb, .gbk, .gb.gz, or .gbk.gz)
+        logger (logging.Logger): Logger instance for logging messages and debugging
         gene_synonyms (dict, optional): Dictionary mapping gene names to standardized synonyms.
             Used to normalize gene naming across different annotation sources.
-        
+            If None, no synonym mapping is applied.
+    
     Returns:
-        tuple: (gene_lengths, gene_cds_info, gene_rRNA_info, gene_tRNA_info) where:
-            - gene_lengths (dict): Dictionary mapping gene names to length information containing:
-                - 'annotated_gene_length': Individual gene length for this copy
-                - 'copies': Always 1 (each copy is stored separately)
-                - 'copy_lengths': List containing single length for this copy
-            - gene_cds_info (dict): Dictionary mapping gene names to CDS information for translation checking
-            - gene_rRNA_info (dict): Dictionary mapping gene names to rRNA information
-            - gene_tRNA_info (dict): Dictionary mapping gene names to tRNA information
-            
-    Note:
-        Multiple copies of the same gene are stored as separate entries with suffixes:
-        - First copy: original gene name (e.g., 'rps12')
-        - Subsequent copies: gene name with '_copy_N' suffix (e.g., 'rps12_copy_2', 'rps12_copy_3')
+        tuple: A tuple containing four dictionaries:
+            - gene_lengths (dict): Dictionary mapping gene names to length information:
+                - 'annotated_gene_length' (int): Length of this gene copy in base pairs
+                - 'copies' (int): Always 1 (each copy is stored as a separate entry)
+                - 'copy_lengths' (list): List containing the single length for this copy
+            - gene_cds_info (dict): Dictionary mapping gene names to CDS information:
+                - 'sequence' (str): DNA sequence of the gene
+                - 'location' (str): GenBank location string
+                - 'translation' (str): Protein translation if available
+            - gene_rRNA_info (dict): Dictionary mapping gene names to rRNA information:
+                - 'sequence' (str): DNA sequence of the gene
+                - 'location' (str): GenBank location string
+            - gene_tRNA_info (dict): Dictionary mapping gene names to tRNA information:
+                - 'sequence' (str): DNA sequence of the gene
+                - 'location' (str): GenBank location string
     
     Raises:
-        ValueError: If no records are found in the GenBank file or if a feature lacks a gene name
-        Exception: Various exceptions that may occur during file parsing or sequence extraction
-        
+        FileNotFoundError: If the GenBank file does not exist
+        ValueError: If the GenBank file is empty or contains no valid records
+        Exception: For other parsing errors
+    
     Note:
-        The function handles multiple copies of the same gene by creating separate entries
-        for each copy with appropriate suffixes. Gene names are standardized using the
-        provided synonym mapping if available.
+        - Multiple copies of the same gene are handled as separate entries
+        - Gene names are standardized using the provided synonyms dictionary
+        - Only functional genes (CDS, rRNA, tRNA) are processed
+        - Source features and other non-gene features are ignored
+        - Multiple copies of the same gene are stored as separate entries with suffixes:
+          - First copy: original gene name (e.g., 'rps12')
+          - Subsequent copies: gene name with '_copy_N' suffix (e.g., 'rps12_copy_2', 'rps12_copy_3')
     """
     gene_lengths = {}
     gene_cds_info = {}
@@ -311,11 +331,16 @@ def extract_gene_name(feature):
     """
     Extract gene name from a Biopython feature's qualifiers.
     
+    This function looks for the 'gene' qualifier in a GenBank feature and returns
+    the gene name if found. This is used to identify genes during parsing and
+    validation.
+    
     Args:
-        feature: Biopython SeqFeature object
+        feature (Bio.SeqFeature.SeqFeature): Biopython SeqFeature object from a GenBank file
         
     Returns:
-        str: Gene name if found, None otherwise
+        str or None: Gene name if found in the 'gene' qualifier, None otherwise
+    
     """
     if 'gene' in feature.qualifiers:
         return feature.qualifiers['gene'][0]
@@ -324,15 +349,31 @@ def extract_gene_name(feature):
 
 def check_gene_translation(gene_name, cds_info_list, logger):
     """
-    Check if a gene's CDS can be translated correctly.
+    Check if a gene's CDS can be translated correctly and identify potential issues.
+    
+    This function performs comprehensive translation validation on CDS sequences,
+    checking for common issues that could indicate annotation problems or sequence
+    errors. It validates start codons, stop codons, sequence length, and translation
+    capability.
     
     Args:
-        gene_name (str): Name of the gene
-        cds_info_list (list): List of CDS information dictionaries containing 'cds_seqrecord'
-        logger: Logger instance for logging messages
+        gene_name (str): Name of the gene being validated
+        cds_info_list (list): List of CDS information dictionaries, each containing:
+            - 'cds_seq' (Bio.Seq.Seq): DNA sequence of the CDS
+            - 'length_mismatch_msg' (str or None): Message about length mismatches if any
+        logger (logging.Logger): Logger instance for logging messages and warnings
         
     Returns:
-        list: List of warning dictionaries for translation issues
+        list: List of warning messages for translation issues found. Each warning is
+              a string describing a specific problem (e.g., "Start codon is GTG, expected ATG")
+    
+    Note:
+        The function checks for:
+        - Sequence length mismatches between feature location and extracted sequence
+        - CDS length being a multiple of 3 (required for translation)
+        - Start codon being ATG (standard start codon)
+        - Stop codon being one of TAA, TAG, or TGA (standard stop codons)
+        - Successful translation without internal stop codons
     """
     warnings = []
 
@@ -907,15 +948,42 @@ def write_gene_length_report(all_results, logger, min_threshold, max_threshold, 
 
 def get_references(args, gene_median_lengths, gene_synonyms=None, data_dir_base=None):
     """
-    Check alignment settings and get reference sequences from appropriate sources.
+    Get reference sequences from appropriate sources for gene validation and alignment.
+    
+    This function determines which reference sequences to use based on command line
+    arguments and retrieves them from the appropriate sources. It can combine
+    references from multiple sources including order-specific references, custom
+    reference folders, and default references.
+    
+    Reference sources are processed in the following order:
+    1. Order-specific references (if --refs_order is specified)
+    2. Custom reference folder (if --custom_refs_folder is specified)
+    3. Default references (if no specific references are specified)
     
     Args:
-        args: Command line arguments containing refs_order, refs_folder, and no_alignment
-        gene_median_lengths (dict): Dictionary of median gene lengths
-        gene_synonyms (dict): Dictionary mapping gene names to standardized synonyms
-        
+        args (argparse.Namespace): Command line arguments containing:
+            - refs_order (list): List of taxonomic orders to use for references
+            - custom_refs_folder (str, optional): Path to custom reference folder
+            - no_alignment (bool): Whether alignment generation is disabled
+        gene_median_lengths (dict): Dictionary mapping gene names to their median lengths
+        gene_synonyms (dict, optional): Dictionary mapping gene names to standardized synonyms
+        data_dir_base (str, optional): Base directory containing PAV data files.
+            If None, will raise ValueError.
+    
     Returns:
-        dict: Dictionary with gene names as keys and lists of SeqRecord objects as values
+        dict: Dictionary with gene names as keys and lists of Bio.SeqRecord.SeqRecord
+              objects as values. Each SeqRecord represents a reference sequence for
+              that gene from the specified sources.
+    
+    Raises:
+        ValueError: If data_dir_base is None or if conflicting arguments are provided
+        SystemExit: If required directories or files are not found
+    
+    Note:
+        - If --no_alignment is True, an empty dictionary is returned
+        - References from multiple sources are merged, with later sources taking precedence
+        - Gene names are standardized using the provided synonyms dictionary
+        - Reference sequences are used for both validation and alignment generation
     """
     
     # Initialize reference sources
@@ -4200,16 +4268,50 @@ def load_annotated_genbank_files(genbank_dir, output_directory, logger):
 
 
 def check_pipeline(args):
-    """Continue pipeline from annotated GenBank files.
+    """
+    Continue PAV pipeline from existing annotated GenBank files.
+    
+    This function processes pre-annotated GenBank files (.gb, .gbk, .gb.gz, .gbk.gz)
+    and performs the validation and analysis steps of the PAV pipeline without
+    re-annotation. It's useful when you already have annotated genomes and want
+    to validate them or generate additional outputs.
+    
+    The pipeline includes:
+    1. Loading and parsing annotated GenBank files
+    2. Gene validation against reference median lengths
+    3. EMBL format conversion (with optional metadata)
+    4. Multiple sequence alignment generation (if not disabled)
+    5. Intergenic region analysis (if not disabled)
+    
     Args:
-        args (argparse.Namespace): Parsed command line arguments containing input file paths
-            and other configuration options.
-
+        args (argparse.Namespace): Parsed command line arguments containing:
+            - annotated_genbank_dir (str): Directory containing annotated GenBank files
+            - output_directory (str): Directory for output files
+            - metadata_tsv (str, optional): Path to metadata TSV file for EMBL conversion
+            - min_length_percentage (float): Minimum acceptable gene length as percentage of median
+            - max_length_percentage (float): Maximum acceptable gene length as percentage of median
+            - no_alignment (bool): Whether to skip alignment generation
+            - skip_intergenic_analysis (bool): Whether to skip intergenic region analysis
+            - pool (int): Number of processes for parallel processing
+            - threads (int): Number of threads per process
+            - refs_order (list): Taxonomic orders to use for reference sequences
+            - custom_refs_folder (str, optional): Custom reference folder path
+            - custom_blast_db (str, optional): Custom BLAST database path
+            - Other pipeline configuration options
+    
     Returns:
         None: No return value specified.
-
+    
     Raises:
-        SystemExit: If input files or directories do not exist.
+        SystemExit: If input files or directories do not exist or if processing fails
+        KeyboardInterrupt: If user interrupts the pipeline (Ctrl+C)
+        Exception: For other processing errors
+    
+    Note:
+        - Supports both single and multi-record GenBank files
+        - Automatically splits multi-record files into individual sequence files
+        - Metadata TSV is optional; default values are used if not provided
+        - All output is written to the specified output directory with organized structure
     """
 
     # Track wall-clock runtime for completion message
@@ -4277,6 +4379,20 @@ def check_pipeline(args):
         else:
             logger.info(f"{"[INFO]:":10} Skipping intergenic region analysis as requested")
  
+    except KeyboardInterrupt:
+        print("\n" + "="*80)
+        print("INTERRUPTED: User requested termination (Ctrl+C)")
+        print("="*80)
+        
+        if 'logger' in globals() and logger:
+            logger.info(f"{"[INFO]:":10} Pipeline interrupted by user (KeyboardInterrupt)")
+            utils.log_separator(logger)
+            utils.log_completion_time(start_time, logger, label="PAV subcommand `check` INTERRUPTED")
+        
+        print("\nCleaning up processes and exiting...")
+        utils.log_manager.cleanup()
+        sys.exit(0)
+        
     except Exception as e:
         utils.log_manager.handle_error(e, traceback.format_exc(), "check_pipeline()")
 
@@ -4290,24 +4406,53 @@ def check_pipeline(args):
 
 
 def main(args):
-    """Main annotation and validation pipeline for plastid genomes.
+    """
+    Main annotation and validation pipeline for plastid genomes.
     
-    This function orchestrates the complete PAV pipeline including:
-    1. Genome annotation using Chloë
-    2. Gene validation against reference data
-    3. EMBL format conversion
-    4. Multiple sequence alignment generation
-    5. Intergenic region analysis
+    This function orchestrates the complete PAV pipeline for annotating and validating
+    plastid genome assemblies. It processes FASTA files, performs annotation using Chloë,
+    and generates comprehensive validation reports and outputs.
+    
+    The complete pipeline includes:
+    1. Genome annotation using Chloë annotation tool
+    2. Genome linearization for consistent annotation
+    3. Gene validation against reference median lengths
+    4. EMBL format conversion with metadata integration
+    5. Multiple sequence alignment generation
+    6. Intergenic region analysis and BLAST searching
     
     Args:
-        args (argparse.Namespace): Parsed command line arguments containing input file paths
-            and other configuration options.
-
+        args (argparse.Namespace): Parsed command line arguments containing:
+            - genome_fasta_dir (str): Directory containing plastid genome FASTA files
+            - metadata_tsv (str): Path to metadata TSV file for EMBL conversion
+            - chloe_project_dir (str): Path to Chloë project directory
+            - output_directory (str): Directory for output files
+            - linearise_gene (list): Genes to use for genome linearization
+            - min_length_percentage (float): Minimum acceptable gene length as percentage of median
+            - max_length_percentage (float): Maximum acceptable gene length as percentage of median
+            - no_alignment (bool): Whether to skip alignment generation
+            - skip_intergenic_analysis (bool): Whether to skip intergenic region analysis
+            - pool (int): Number of processes for parallel processing
+            - threads (int): Number of threads per process
+            - refs_order (list): Taxonomic orders to use for reference sequences
+            - custom_refs_folder (str, optional): Custom reference folder path
+            - custom_blast_db (str, optional): Custom BLAST database path
+            - Other pipeline configuration options
+    
     Returns:
         None: No return value specified.
-
+    
     Raises:
-        SystemExit: If input files or directories do not exist.
+        SystemExit: If input files or directories do not exist or if processing fails
+        KeyboardInterrupt: If user interrupts the pipeline (Ctrl+C)
+        Exception: For other processing errors
+    
+    Note:
+        - Supports both single and multi-sequence FASTA files per sample
+        - Multi-sequence files are processed as fragmented assemblies
+        - All samples must be listed in the metadata TSV file
+        - Genome linearization is performed unless sample is marked as 'linear' in metadata
+        - All output is written to the specified output directory with organized structure
     """
 
     # Track wall-clock runtime for completion message
@@ -4380,6 +4525,20 @@ def main(args):
         else:
             logger.info(f"{"[INFO]:":10} Skipping intergenic region analysis as requested")
  
+    except KeyboardInterrupt:
+        print("\n" + "="*80)
+        print("INTERRUPTED: User requested termination (Ctrl+C)")
+        print("="*80)
+        
+        if 'logger' in globals() and logger:
+            logger.info(f"{"[INFO]:":10} Pipeline interrupted by user (KeyboardInterrupt)")
+            utils.log_separator(logger)
+            utils.log_completion_time(start_time, logger, label="PAV subcommand `annotate_and_check` INTERRUPTED")
+        
+        print("\nCleaning up processes and exiting...")
+        utils.log_manager.cleanup()
+        sys.exit(0)
+        
     except Exception as e:
         utils.log_manager.handle_error(e, traceback.format_exc(), "main()")
 

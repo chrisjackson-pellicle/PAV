@@ -378,7 +378,7 @@ def check_dependencies(args, logger, entry='main'):
 
             if not os.path.isdir(args.chloe_project_dir):
                 logger.info(f'{"":15} {"chloe project":20} not found at {args.chloe_project_dir}!')
-                all_executables_found = False
+                all_executables_found = False   
             else:
                 logger.info(f'{"":15} {"chloe project":20} found at {args.chloe_project_dir}')
 
