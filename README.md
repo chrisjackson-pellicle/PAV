@@ -19,7 +19,7 @@ PAV processes plastid genome assemblies, performs annotation using [Chloë](http
 ## Features
 
 - **Automated annotation**: Uses Chloë for plastid genome annotation
-- **Genome linearization**: Automatically linearises genomes upstream of a specified gene (defaults to `psbA`) unless genome is specified as 'linear' or the gene is not found
+- **Genome linearisation**: Automatically linearises genomes upstream of a specified gene (defaults to `psbA`) unless genome is specified as 'linear' or the gene is not found
 - **Quality assessment**: Validates gene lengths, identifies internal stop codons, and checks for canonical start and stop codons
 - **Reference-based validation**: Compares annotations against reference genomes from multiple sources (order-specific, default, or custom)
 - **Alignment generation**: Creates nucleotide alignments with reference sequences for CDS, rRNA, and tRNA genes
@@ -192,13 +192,14 @@ usage: pav check [-h] [--min_length_percentage FLOAT]
                  [--output_directory DIR] [--pool INTEGER]
                  [--threads INTEGER] [--metadata_tsv TSV]
                  [--run_profiler]
-                 DIR
+                 ANNOTATED_GENBANK_DIR
 
 options:
   -h, --help            show this help message and exit
 
 Required input:
-  DIR                   Directory containing annotated GenBank files (.gb, .gbk, .gb.gz, .gbk.gz).
+  ANNOTATED_GENBANK_DIR
+                        Directory containing already annotated GenBank files.
 
 Optional input:
   --metadata_tsv TSV    TSV file containing sample metadata for EMBL conversion.
@@ -323,7 +324,7 @@ pav annotate_and_check \
   --no_alignment
 ```
 
-#### Custom linearization gene(s):
+#### Custom linearisation gene(s):
 ```bash
 # Single gene (default behavior)
 pav annotate_and_check \
@@ -429,8 +430,8 @@ output_dir/
 │   └── sample_name/
 │       ├── <prefix>.round1.chloe.gbk            # Original annotation (preserved)
 │       ├── <prefix>.round1.chloe.gff            # Original GFF (preserved)
-│       ├── <prefix>.round2.chloe.gbk            # Re-annotated after linearization
-│       ├── <prefix>.round2.chloe.gff            # Re-annotated after linearization
+│       ├── <prefix>.round2.chloe.gbk            # Re-annotated after linearisation
+│       ├── <prefix>.round2.chloe.gff            # Re-annotated after linearisation
 │       └── <prefix>.round2.fasta                # Linearised sequence
 │       └── <prefix>.round2.chloe_intergenic_debug.fasta   # Optional (when --debug_intergenic)
 │       └── <prefix>_seq001_<seqname>.fasta      # Individual sequences (multi-sequence files only)
@@ -580,7 +581,7 @@ output_dir/
   - Taxonomic classification (Order, Family, Genus, Species)
   - Source file information
 
-## Linearization
+## Linearisation
 
 PAV automatically linearises plastid genomes upstream of specified gene(s) to ensure consistent annotation and to avoid issues with genes that span the circular genome boundary (see below).
 
@@ -675,7 +676,7 @@ In these scenarios, PAV will produce gene length warnings in the report files, s
 When annotating FASTA sequences using `pav annotate_and_check`, PAV uses a two-pass approach to avoid these issues:
 
 1. **First annotation**: The input sequence is annotated once with Chloë
-2. **Linearization**: The location of a specified gene is recovered (`psbA` by default, can be changed with `--linearise_gene <gene_name>`) and the input FASTA is linearised just upstream
+2. **Linearisation**: The location of a specified gene is recovered (`psbA` by default, can be changed with `--linearise_gene <gene_name>`) and the input FASTA is linearised just upstream
 3. **Second annotation**: The input sequence is annotated again with Chloë using the linearised sequence as input
 
 This approach ensures that no annotation should cross the ends of the annotated FASTA sequence.
@@ -758,7 +759,7 @@ Reference gene lengths are stored in [`data/plDNA_genes_median_lengths.csv`](htt
 4. **Metadata TSV columns**: Ensure the TSV has the required columns listed above
 5. **Memory issues**: Reduce `--pool` and `--threads` parameters
 6. **Custom reference folder not found**: Verify the path to your custom reference folder exists and contains GenBank files
-7. **Linearization gene(s) not found**: If none of the specified linearization genes are found in a genome, the original sequence will be used without linearization. Genes are validated against the gene_synonyms.txt file to ensure they are legitimate plastid genes
+7. **Linearisation gene(s) not found**: If none of the specified linearisation genes are found in a genome, the original sequence will be used without linearisation. Genes are validated against the gene_synonyms.txt file to ensure they are legitimate plastid genes
 8. **Gzipped GenBank files**: PAV supports both compressed (.gz) and uncompressed GenBank files as input for the `check` subcommand
 
 ## Support
