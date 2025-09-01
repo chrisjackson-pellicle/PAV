@@ -681,7 +681,7 @@ When annotating FASTA sequences using `pav annotate_and_check`, PAV uses a two-p
 
 This approach ensures that no annotation should cross the ends of the annotated FASTA sequence.
 
-**Note**: If the specified gene for linearisation cannot be found, the FASTA sequence is processed as-is. Moreover, if the genome is specified as 'linear' in the metadata, no linearisation is performed (as the sequence cannot be 'rotated' while maintaining accurate annotation cooridinates in the same way a circularised genome fasta sequence can be).
+**Note**: If the specified gene for linearisation cannot be found, the FASTA sequence is processed as-is. Moreover, if the genome is specified as 'linear' in the metadata, no linearisation is performed (as the sequence cannot be 'rotated' while maintaining accurate annotation coordinates in the same way a circularised genome fasta sequence can be).
 
 
 ## Gene types supported
