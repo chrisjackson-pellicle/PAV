@@ -4475,7 +4475,7 @@ def main(args):
         # Check for external dependencies:
         utils.check_dependencies(args, logger)
 
-        # Resolve base data directory after dependency check
+        # Resolve base data directory
         data_dir_base = utils.resolve_data_dir_base()
 
         # Load gene median lengths from resolved data directory
