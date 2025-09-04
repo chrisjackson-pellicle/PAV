@@ -14,6 +14,8 @@
 - Improved error handling when running Chloë so that errors for a single sample/sequence are logged and do not crash the whole pipeline
 - Added `--no-filter` option to `pav annotate_and_check`to disable Chloë annotation filtering. When present, the `--no-filter` flag will be used in the Chloë annotation command. Previously this flag was used by default
 - Fixed debug intergenic FASTA file output: when using `--debug_intergenic` with `pav check`, debug FASTA files are now written to the `04_intergenic_analysis` output directory instead of sometimes overwriting input GenBank files. These FASTA files are also now written to `04_intergenic_analysis` when running `pav annotate_and_check`
+- Added Chloë installation verification: PAV now checks if Chloë is properly installed and accessible by running `chloe.jl annotate --help` before starting the annotation pipeline
+- Enhanced error handling: PAV now exits gracefully with an informative message if no annotated genomes are found after Chloë processing, preventing downstream errors
 
 
 ### Version 1.0.0

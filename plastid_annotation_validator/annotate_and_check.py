@@ -82,7 +82,6 @@ def load_gene_synonyms(data_dir_base=None):
     candidate_path = os.path.join(data_dir_base, 'gene_synonyms.txt')
     if not os.path.exists(candidate_path):
         raise FileNotFoundError(f"Gene synonyms file not found at: {candidate_path}")
-    print(candidate_path)
     
     gene_synonyms = {}
     with open(candidate_path, 'r') as synonyms_file:
@@ -3238,6 +3237,7 @@ def annotate_genomes(genome_fasta_dir, output_directory, chloe_project_dir, no_f
 
     annotated_genomes = dict({})
     seqs_with_annotation_errors = dict()
+    samples_with_annotation_errors = dict()
     
     # Process files with multiprocessing
     logger.info(f"{"[INFO]:":10} Processing {len(fasta_files)} FASTA files with {pool_size} processes")
@@ -3262,8 +3262,24 @@ def annotate_genomes(genome_fasta_dir, output_directory, chloe_project_dir, no_f
 
                 if seqs_with_errors:
                     seqs_with_annotation_errors[sample_name] = seqs_with_errors
-                annotated_genomes[sample_name] = sample_data
-                logger.debug(f"{"[DEBUG]:":10} Successfully processed {sample_name}")
+
+                # Only keep samples that have successful outputs
+                if sample_data.get('is_multi_sequence'):
+                    # For multi-sequence inputs, keep only if at least one sequence succeeded
+                    if sample_data.get('sequences'):
+                        annotated_genomes[sample_name] = sample_data
+                        logger.debug(f"{"[DEBUG]:":10} Successfully processed {sample_name}")
+                    else:
+                        logger.debug(f"{"[DEBUG]:":10} Skipping {sample_name} - no sequences were annotated successfully")
+                        samples_with_annotation_errors[sample_name] = f'Skipping {sample_name} - no sequences were annotated successfully'
+                else:
+                    # For single-sequence inputs, require gbk and gff to be present
+                    if ('gbk' in sample_data and 'gff' in sample_data):
+                        annotated_genomes[sample_name] = sample_data
+                        logger.debug(f"{"[DEBUG]:":10} Successfully processed {sample_name}")
+                    else:
+                        logger.debug(f"{"[DEBUG]:":10} Skipping {sample_name} - no sequences were annotated successfully")
+                        samples_with_annotation_errors[sample_name] = f'Skipping {sample_name} - no sequences were annotated successfully'
             else:
                 utils.log_manager.handle_error(result[0], result[1], 'annotate_genomes()', fasta_file)
 
@@ -3277,6 +3293,9 @@ def annotate_genomes(genome_fasta_dir, output_directory, chloe_project_dir, no_f
                     logger.debug(f"{"":10} {seq_error[1][0]}")
                     logger.debug(f"{"":10} {seq_error[1][1]}")
                     logger.debug(f"{"":10} {seq_error[1][2]}")
+                
+                if sample_name in samples_with_annotation_errors:
+                    logger.warning(f"{"":10} {samples_with_annotation_errors[sample_name]}")
 
             logger.warning("")
             logger.warning(f"{"":10} These sequences were not annotated and will not be used in the pipeline")
@@ -3369,8 +3388,7 @@ def process_single_fasta_file(fasta_file, annotated_genomes_dir, chloe_project_d
                 else:
                     seqs_with_errors.append((seq_result, seq_error_tuple))  # Here seq_result is an error string
             
-            # Store the multi-sequence sample info
-            # For multi-sequence, collect all individual sequence files
+            # Store the multi-sequence sample info; for multi-sequence, collect all individual sequence files
             if sample_data['sequences']:
                 # Store all individual sequence files
                 all_gbk_files = []
@@ -5014,6 +5032,7 @@ def check_pipeline(args):
         utils.log_manager.cleanup()
 
 
+
 def main(args):
     """
     Main annotation and validation pipeline for plastid genomes.
@@ -5118,6 +5137,10 @@ def main(args):
             args.pool,
             log_queue,
         )
+
+        if not annotated_genomes_dict:
+            logger.warning(f"{"[WARNING]:":10} No annotated genomes found, exiting.")
+            utils.exit_program()
         
         # Check genes and write reports
         all_sample_results = check_genes(gene_median_lengths, annotated_genomes_dict, args.min_length_percentage,

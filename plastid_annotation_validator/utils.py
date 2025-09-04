@@ -367,9 +367,9 @@ def check_dependencies(args, logger, entry='main'):
     for executable in executables:
         executable_loc = shutil.which(executable)
         if executable_loc:
-            logger.info(f'{"":15} {executable:20} found at {executable_loc}')
+            logger.info(f'{"":15} {executable:20} Found at {executable_loc}')
         else:
-            logger.info(f'{"":15} {executable:20} not found in your $PATH!')
+            logger.info(f'{"":15} {executable:20} Not found in your $PATH!')
             all_executables_found = False
 
     if entry == 'main':
@@ -377,16 +377,46 @@ def check_dependencies(args, logger, entry='main'):
             chloe_script = os.path.join(args.chloe_project_dir, 'chloe.jl')
 
             if not os.path.isdir(args.chloe_project_dir):
-                logger.info(f'{"":15} {"chloe project":20} not found at {args.chloe_project_dir}!')
+                logger.info(f'{"":15} {"chloe project":20} Not found at {args.chloe_project_dir}!')
                 all_executables_found = False   
             else:
-                logger.info(f'{"":15} {"chloe project":20} found at {args.chloe_project_dir}')
+                logger.info(f'{"":15} {"chloe project":20} Found at {args.chloe_project_dir}')
 
             if not os.path.exists(chloe_script):
-                logger.info(f'{"":15} {"chloe.jl":20} not found at {chloe_script}!')
+                logger.info(f'{"":15} {"chloe.jl":20} Not found at {chloe_script}!')
                 all_executables_found = False
             else:
-                logger.info(f'{"":15} {"chloe.jl":20} found at {chloe_script}')
+                logger.info(f'{"":15} {"chloe.jl":20} Found at {chloe_script}')
+
+            try:
+                # Run chloe.jl annotate --help to check if it's accessible
+                logger.info(f'{"":15} {"":20} Checking command `chloe.jl annotate --help` runs successfully...')
+                result = subprocess.run(
+                    ['julia', f'--project={args.chloe_project_dir}', chloe_script, 'annotate', '--help'],
+                    capture_output=True,
+                    text=True,
+                    timeout=30  # 30 second timeout
+                )
+
+                if result.returncode == 0:
+                    logger.info(f"{"":15} {"":20} Command `chloe.jl annotate --help` ran successfully")
+                else:
+                    logger.error(f"{"":15} {"":20} Chloë returned non-zero exit code: {result.returncode}")
+                    all_executables_found = False
+
+                    if result.stderr:
+                        logger.error(f"{"":15} {"":20} Chloë error output: {result.stderr}")
+                    logger.error(f"{"":15} {"":20} Please check your Chloë installation")
+
+            except TimeoutError:
+                logger.error(f"{"":15} {"":20} command `chloe.jl annotate --help` timed out after 30 seconds")
+                logger.error(f"{"":15} {"":20} Please check your Chloë installation")
+                all_executables_found = False
+
+            except Exception as e:
+                logger.error(f"{"":15} {"":20} Failed to check Chloë installation: {str(e)}")
+                logger.error(f"{"":15} {"":20} Please check your Chloë installation") 
+                all_executables_found = False   
 
     logger.info('')
 
