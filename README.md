@@ -10,7 +10,7 @@
 
 A tool for annotating and validating angiosperm plastid genome annotations, with support for reference-based alignment, quality assessment, and characterisation of intergenic regions. 
 
-Current version: 1.0.0 (August 2025). See the change_log.md [here](https://github.com/chrisjackson-pellicle/PAV/blob/main/change_log.md)
+Current version: 1.0.1 (August 2025). See the change_log.md [here](https://github.com/chrisjackson-pellicle/PAV/blob/main/change_log.md)
 
 ## Overview
 
@@ -18,7 +18,7 @@ PAV processes plastid genome assemblies, performs annotation using [Chloë](http
 
 ## Features
 
-- **Automated annotation**: Uses Chloë for plastid genome annotation
+- **Automated annotation**: Uses Chloë for plastid genome annotation with optional filtering control
 - **Genome linearisation**: Automatically linearises genomes upstream of a specified gene (defaults to `psbA`) unless genome is specified as 'linear' or the gene is not found
 - **Quality assessment**: Validates gene lengths, identifies internal stop codons, and checks for canonical start and stop codons
 - **Reference-based validation**: Compares annotations against reference genomes from multiple sources (order-specific, default, or custom)
@@ -142,8 +142,13 @@ pav db_for_intgen \
 #### `pav annotate_and_check` - full annotation and validation pipeline
 
 ```
-usage: pav annotate_and_check [-h] [--min_length_percentage FLOAT]
-                              [--max_length_percentage FLOAT] [--no_alignment]
+usage: pav annotate_and_check [-h]
+                              [--linearise_gene GENE_NAME [GENE_NAME ...]]
+                              [--no-filter] [--min_length_percentage FLOAT]
+                              [--max_length_percentage FLOAT]
+                              [--no_per_sample_alignments_with_refs]
+                              [--no_per_gene_alignments_with_refs]
+                              [--no_sample_only_alignments]
                               [--refs_order ORDER [ORDER ...]]
                               [--custom_refs_folder DIR]
                               [--min_intergenic_length INTEGER]
@@ -153,7 +158,6 @@ usage: pav annotate_and_check [-h] [--min_length_percentage FLOAT]
                               [--custom_blast_db PATH]
                               [--output_directory DIR] [--pool INTEGER]
                               [--threads INTEGER] [--run_profiler]
-                              [--linearise_gene GENE_NAME [GENE_NAME ...]]
                               GENOME_FASTA_DIR METADATA_TSV CHLOE_PROJECT_DIR
 
 options:
@@ -171,26 +175,29 @@ Required input:
   CHLOE_PROJECT_DIR     Path to the Chloë project directory; chloe.jl is
                         expected at <DIR>/chloe.jl
 
-General pipeline options:
+Genome annotation:
   --linearise_gene GENE_NAME [GENE_NAME ...]
-                        Gene(s) to use for genome linearisation. Can specify multiple genes.
-                        Genes will be tried in order until one is found. Default is: ['psbA']
+                        Gene(s) to use for genome linearisation. Can specify
+                        multiple genes. Genes will be tried in order until one
+                        is found. Default is: ['psbA']
+  --no-filter           Use the `--no-filter` flag in the chloe annotate
+                        command. Default is: False
 ```
 
 #### `pav check` - continue pipeline from annotated GenBank files
 
 ```
-usage: pav check [-h] [--min_length_percentage FLOAT]
-                 [--max_length_percentage FLOAT] [--no_alignment]
-                 [--refs_order ORDER [ORDER ...]]
-                 [--custom_refs_folder DIR]
-                 [--min_intergenic_length INTEGER]
-                 [--blast_evalue FLOAT]
-                 [--skip_intergenic_analysis]
-                 [--debug_intergenic] [--max_blast_hits INTEGER]
-                 [--custom_blast_db PATH]
-                 [--output_directory DIR] [--pool INTEGER]
-                 [--threads INTEGER] [--metadata_tsv TSV]
+usage: pav check [-h] [--metadata_tsv METADATA_TSV]
+                 [--min_length_percentage FLOAT]
+                 [--max_length_percentage FLOAT]
+                 [--no_per_sample_alignments_with_refs]
+                 [--no_per_gene_alignments_with_refs]
+                 [--no_sample_only_alignments]
+                 [--refs_order ORDER [ORDER ...]] [--custom_refs_folder DIR]
+                 [--min_intergenic_length INTEGER] [--blast_evalue FLOAT]
+                 [--skip_intergenic_analysis] [--debug_intergenic]
+                 [--max_blast_hits INTEGER] [--custom_blast_db PATH]
+                 [--output_directory DIR] [--pool INTEGER] [--threads INTEGER]
                  [--run_profiler]
                  ANNOTATED_GENBANK_DIR
 
@@ -218,9 +225,15 @@ Gene length warnings:
                         for a warning to be issued. Default is: 1.2
 
 Alignment with reference genes:
-  --no_alignment, -no_align
-                        Do not align annotated genes with reference genes.
-                        Default is: False
+  --no_per_sample_alignments_with_refs
+                        Do not generate per-sample alignments with reference genes.
+                        Default is: False (alignments run by default)
+  --no_per_gene_alignments_with_refs
+                        Do not generate per-gene alignments with reference genes
+                        (combined samples). Default is: False (alignments run by default)
+  --no_sample_only_alignments
+                        Do not generate sample-only alignments (no reference sequences).
+                        Default is: False (alignments run by default)
   --refs_order ORDER [ORDER ...], -refs_ord ORDER [ORDER ...]
                         Order(s) to use for reference genes. Can be specified
                         multiple times. Default is: []
@@ -240,7 +253,7 @@ Intergenic region analysis:
                         Skip intergenic region analysis. Default is: False
   --debug_intergenic, -debug_ig
                         Write intergenic regions to FASTA files for debugging.
-                        Default is: False
+                        Files are written to the output directory. Default is: False
   --max_blast_hits INTEGER, -max_hits INTEGER
                         Maximum number of BLAST hits to retain per intergenic
                         region. Default is: 1
@@ -313,6 +326,16 @@ pav annotate_and_check \
   chloe_project_dir \
   --refs_order Alismatales \
   --custom_refs_folder /path/to/custom/references/
+```
+
+#### Both reference-based and sample-only alignments:
+```bash
+pav annotate_and_check \
+  genomes/ \
+  metadata.tsv \
+  chloe_project_dir \
+  --refs_order Fabales \
+  --alignments_no_refs
 ```
 
 #### Skip alignments:
@@ -433,7 +456,6 @@ output_dir/
 │       ├── <prefix>.round2.chloe.gbk            # Re-annotated after linearisation
 │       ├── <prefix>.round2.chloe.gff            # Re-annotated after linearisation
 │       └── <prefix>.round2.fasta                # Linearised sequence
-│       └── <prefix>.round2.chloe_intergenic_debug.fasta   # Optional (when --debug_intergenic)
 │       └── <prefix>_seq001_<seqname>.fasta      # Individual sequences (multi-sequence files only)
 │       └── <prefix>_seq001_<seqname>.round1.chloe.gbk  # Individual sequence annotations
 │       └── <prefix>_seq001_<seqname>.round1.chloe.gff  # Individual sequence GFF files
@@ -441,18 +463,23 @@ output_dir/
 │   ├── <sample_name>.embl                        # EMBL format
 │   └── ena_submission_embl_files/
 │       └── <sample_name>.ena.embl                # ENA template (derived from EMBL)
-├── 03_alignments_with_refs/
-│   ├── 01_per_sample_alignments/
+├── 03_alignments/
+│   ├── 01_per_sample_alignments_with_refs/              
 │   │   └── <sample_name>/
 │   │       ├── <sample>_<gene>_alignment.fasta          # Per-sample CDS alignment
 │   │       ├── <sample>_<gene>_rRNA_alignment.fasta     # Per-sample rRNA alignment
 │   │       └── <sample>_<gene>_tRNA_alignment.fasta     # Per-sample tRNA alignment
-│   └── 02_per_gene_alignments/
-│       └── <gene>_all_samples_alignment.fasta           # All samples combined (nucleotide)
-├── 04_intergenic_analysis/
+│   ├── 02_per_gene_alignments_with_refs/
+│   │   └── <gene>_all_samples_alignment.fasta           # All samples combined (nucleotide)
+│   └── 03_alignments_sample_only/                       # Sample-only alignments
+│       └── 01_per_gene_alignments/
+│           └── <gene>_sample_only_alignment.fasta       # Sample sequences only (no references)
+└──  04_intergenic_analysis/
     ├── <sample_name>_intergenic_blast_results.tsv       # Per-sample BLAST results
+    ├── <sample_name>_intergenic_debug.fasta             # Optional (when --debug_intergenic)
     └── combined_intergenic_blast_results.tsv            # Combined BLAST results
 ```
+
 
 ### For `pav check`:
 ```
@@ -469,16 +496,20 @@ output_dir/
 │   ├── <sample_name>.embl                               # EMBL format
 │   └── ena_submission_embl_files/
 │       └── <sample_name>.ena.embl                       # ENA template (derived from EMBL)
-├── 03_alignments_with_refs/
-│   ├── 01_per_sample_alignments/
+├── 03_alignments/
+│   ├── 01_per_sample_alignments_with_refs/
 │   │   └── <sample_name>/
 │   │       ├── <sample>_<gene>_alignment.fasta          # Per-sample CDS alignment
 │   │       ├── <sample>_<gene>_rRNA_alignment.fasta     # Per-sample rRNA alignment
 │   │       └── <sample>_<gene>_tRNA_alignment.fasta     # Per-sample tRNA alignment
-│   └── 02_per_gene_alignments/
-│       └── <gene>_all_samples_alignment.fasta           # All samples combined (nucleotide)
-├── 04_intergenic_analysis/
+│   ├── 02_per_gene_alignments_with_refs/
+│   │   └── <gene>_all_samples_alignment.fasta           # All samples combined (nucleotide)
+│   └── 03_alignments_sample_only/                       # Sample-only alignments
+│       └── 01_per_gene_alignments/
+│           └── <gene>_sample_only_alignment.fasta       # Sample sequences only (no references)
+└──  04_intergenic_analysis/
     ├── <sample_name>_intergenic_blast_results.tsv       # Per-sample BLAST results
+    ├── <sample_name>_intergenic_debug.fasta             # Optional (when --debug_intergenic)
     └── combined_intergenic_blast_results.tsv            # Combined BLAST results
 ```
 
@@ -511,6 +542,8 @@ output_dir/
 - Performs initial annotation on original sequences
 - Linearises genomes upstream of specified gene(s) (default: `psbA`), unless sample is recorded as `linear` in metadata. Multiple genes can be specified and will be tried in order until one is found. If no specified genes are found in the sequence, no linearisation occurs
 - Re-annotates linearised sequences
+- If Chloë fails to annotate a sample (or sequence for a multi-sequence sample), PAV logs the error and continues processing other samples/sequences
+- Use `--no-filter` to disable Chloë's built-in filtering if you want to retain all annotations regardless of quality
 
 #### 2. Annotation validation
 - Validates gene annotations against reference data
@@ -518,8 +551,10 @@ output_dir/
 - Generates detailed reports
 
 #### 3. Alignment generation
-- Creates nucleotide alignments with reference sequences for rRNA and tRNA genes
-- Generates codon-aware nucleotide alignments for CDS genes
+- **Per-sample alignments with references**: Creates nucleotide alignments with reference sequences for rRNA and tRNA genes, and generates codon-aware nucleotide alignments for CDS genes
+- **Per-gene alignments with references**: Generates alignments combining all samples with reference sequences
+- **Sample-only alignments**: Generates alignments using only sample sequences (no external references)
+- **All alignment types run by default** unless disabled with specific `--no_*` flags
 
 #### 4. EMBL and ENA template generation
 - Adds locus tags and standardizes features for EMBL
@@ -545,7 +580,10 @@ output_dir/
 
 #### 3. Alignment generation
 - Same alignment process as the full pipeline
-- Creates nucleotide alignments with reference sequences
+- **Per-sample alignments with references**: Creates nucleotide alignments with reference sequences
+- **Per-gene alignments with references**: Generates alignments combining all samples with reference sequences  
+- **Sample-only alignments**: Generates alignments using only sample sequences (no external references)
+- **All alignment types run by default** unless disabled with specific `--no_*` flags
 
 #### 4. EMBL and ENA template generation
 - Same EMBL conversion process as the full pipeline
@@ -631,6 +669,7 @@ Notes:
 - **For `pav annotate_and_check`**: all samples must be present in the metadata file
 - **For `pav check`**: metadata is optional - if not provided, samples will be processed without metadata
 - Samples marked as `linear` will **not be relinearised** at the `--linearise_gene` position, preserving their original linear structure
+- **GenBank topology correction**: Chloë always outputs "circular" in GenBank LOCUS lines, but `pav annotate_and_check` automatically corrects this to match the `linear_or_circular` value from the metadata file
 
 ## Intergenic regions reports
 

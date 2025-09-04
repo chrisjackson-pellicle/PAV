@@ -82,6 +82,7 @@ def load_gene_synonyms(data_dir_base=None):
     candidate_path = os.path.join(data_dir_base, 'gene_synonyms.txt')
     if not os.path.exists(candidate_path):
         raise FileNotFoundError(f"Gene synonyms file not found at: {candidate_path}")
+    print(candidate_path)
     
     gene_synonyms = {}
     with open(candidate_path, 'r') as synonyms_file:
@@ -145,6 +146,139 @@ def load_gene_median_lengths(data_dir_base=None):
     
     
     return gene_median_lengths
+
+
+def check_input_fasta_files(fasta_dir):
+    """
+    Validate that all input FASTA sequences contain only valid DNA characters.
+    
+    This function checks each FASTA file in the input directory to ensure that all
+    sequences contain only valid DNA characters, including standard bases (A, C, G, T),
+    ambiguity codes (R, Y, S, W, K, M, B, D, H, V), N (any base), and whitespace.
+    Files with invalid characters are flagged and the function exits with an error
+    message listing all problematic genomes.
+    
+    Valid DNA characters include:
+    - Standard bases: A, C, G, T (case insensitive)
+    - Ambiguity codes: R, Y, S, W, K, M, B, D, H, V (case insensitive)
+    - N: Represents any base (case insensitive)
+    - Dash (-): Represents gaps or deletions
+    - Whitespace: Spaces, tabs, newlines (ignored during validation)
+    
+    Args:
+        fasta_dir (str): Path to directory containing input FASTA files
+    
+    Returns:
+        None: No return value specified
+    
+    Raises:
+        SystemExit: If any FASTA files contain invalid characters, with a message
+                   listing all problematic genomes
+    
+    Note:
+        - Supports common FASTA file extensions: .fasta, .fa, .fas
+        - Validation is case-insensitive
+        - Whitespace is ignored during character validation
+        - Empty sequences are allowed but logged as warnings
+    """
+
+    # Define valid DNA characters (case insensitive)
+    valid_dna_chars = set('ACGTNacgtn')
+    valid_ambiguity_chars = set('RYSWKMBDHVryswkmbdhv')
+    valid_gap_chars = set('-')  # Dash represents gaps/deletions
+    all_valid_chars = valid_dna_chars | valid_ambiguity_chars | valid_gap_chars
+    
+    # Find all FASTA files in the directory
+    fasta_extensions = ['*.fasta', '*.fa', '*.fas']
+    fasta_files = []
+    for ext in fasta_extensions:
+        fasta_files.extend(glob.glob(os.path.join(fasta_dir, ext)))
+    
+    if not fasta_files:
+        raise FileNotFoundError(f"No FASTA files found in directory: {fasta_dir}")
+    
+    problematic_genomes = []
+    
+    for fasta_file in fasta_files:
+        filename = os.path.basename(fasta_file)
+        genome_name = os.path.splitext(filename)[0]
+        
+        try:
+            # Parse the FASTA file
+            with open(fasta_file, 'r') as handle:
+                records = list(SeqIO.parse(handle, 'fasta'))
+            
+            if not records:
+                logger.warning(f"{"[WARNING]:":10} No sequences found in {filename}")
+                continue
+            
+            # Check each sequence in the file
+            for i, record in enumerate(records):
+                sequence = str(record.seq).upper()
+                
+                # Remove whitespace and check for invalid characters
+                sequence_clean = re.sub(r'\s', '', sequence)
+                
+                if not sequence_clean:
+                    logger.warning(f"{"[WARNING]:":10} Empty sequence {i+1} in {filename}")
+                    continue
+                
+                # Check for invalid characters
+                invalid_chars = set(sequence_clean) - all_valid_chars
+                if invalid_chars:
+                    problematic_genomes.append({
+                        'filename': filename,
+                        'genome_name': genome_name,
+                        'sequence_num': i + 1,
+                        'sequence_id': record.id,
+                        'invalid_chars': sorted(invalid_chars),
+                        'example_invalid': next(iter(invalid_chars))
+                    })
+                    break  # Only report the first invalid sequence per file
+            
+        except Exception as e:
+            problematic_genomes.append({
+                'filename': filename,
+                'genome_name': genome_name,
+                'sequence_num': 1,
+                'sequence_id': 'unknown',
+                'invalid_chars': ['PARSE_ERROR'],
+                'example_invalid': f"File parsing error: {str(e)}"
+            })
+    
+    # If any problematic genomes found, exit with error message
+    if problematic_genomes:
+
+        logger.error(f"{"[ERROR]:":10} INVALID DNA CHARACTERS DETECTED IN INPUT FASTA FILES\n")
+
+        logger.error(f"{"":10} The following {len(problematic_genomes)} genomes contain invalid characters:")
+        logger.error("")
+        
+        for problem in problematic_genomes:
+            logger.error(f"{"":10} File: {problem['filename']}")
+            logger.error(f"{"":10} Genome: {problem['genome_name']}")
+            logger.error(f"{"":10} Sequence: {problem['sequence_num']} (ID: {problem['sequence_id']})")
+            
+            if 'PARSE_ERROR' in problem['invalid_chars']:
+                logger.error(f"{"":10} Error: {problem['example_invalid']}")
+            else:
+                logger.error(f"{"":10} Invalid characters: {', '.join(problem['invalid_chars'])}")
+                logger.error(f"{"":10} Example: '{problem['example_invalid']}'")
+            
+            logger.error("")
+        
+        logger.error(f"{"":10} Valid DNA characters include:")
+        logger.error(f"{"":10} - Standard bases: A, C, G, T (case insensitive)")
+        logger.error(f"{"":10} - Ambiguity codes: R, Y, S, W, K, M, B, D, H, V (case insensitive)")
+        logger.error(f"{"":10} - N: Represents any base (case insensitive)")
+        logger.error(f"{"":10} - Dash (-): Represents gaps or deletions")
+        logger.error(f"{"":10} - Whitespace is ignored")
+        logger.error("")
+        logger.error(f"{"":10} Please fix these files and try again.")
+ 
+        utils.exit_program()
+    
+    logger.info(f"{"[INFO]:":10} Successfully validated {len(fasta_files)} FASTA files - all sequences contain valid DNA characters")
 
 
 def parse_gbk_genes(gbk_file_path, logger, gene_synonyms=None):
@@ -344,6 +478,9 @@ def extract_gene_name(feature):
     """
     if 'gene' in feature.qualifiers:
         return feature.qualifiers['gene'][0]
+    elif 'product' in feature.qualifiers:
+        return '_'.join(feature.qualifiers['product'])
+    
     return None
 
 
@@ -964,7 +1101,9 @@ def get_references(args, gene_median_lengths, gene_synonyms=None, data_dir_base=
         args (argparse.Namespace): Command line arguments containing:
             - refs_order (list): List of taxonomic orders to use for references
             - custom_refs_folder (str, optional): Path to custom reference folder
-            - no_alignment (bool): Whether alignment generation is disabled
+            - no_per_sample_alignments_with_refs (bool): Whether to disable per-sample alignments with references
+            - no_per_gene_alignments_with_refs (bool): Whether to disable per-gene alignments with references
+            - no_sample_only_alignments (bool): Whether to disable sample-only alignments
         gene_median_lengths (dict): Dictionary mapping gene names to their median lengths
         gene_synonyms (dict, optional): Dictionary mapping gene names to standardized synonyms
         data_dir_base (str, optional): Base directory containing PAV data files.
@@ -978,9 +1117,9 @@ def get_references(args, gene_median_lengths, gene_synonyms=None, data_dir_base=
     Raises:
         ValueError: If data_dir_base is None or if conflicting arguments are provided
         SystemExit: If required directories or files are not found
-    
+
     Note:
-        - If --no_alignment is True, an empty dictionary is returned
+        - If --no_per_sample_alignments_with_refs and --no_per_gene_alignments_with_refs are True, an empty dictionary is returned
         - References from multiple sources are merged, with later sources taking precedence
         - Gene names are standardized using the provided synonyms dictionary
         - Reference sequences are used for both validation and alignment generation
@@ -997,10 +1136,10 @@ def get_references(args, gene_median_lengths, gene_synonyms=None, data_dir_base=
 
     # Check if refs_order contains entries
     if args.refs_order:
-        # If refs_order is specified, no_alignment must be False
-        if args.no_alignment:
-            logger.error(f"{"[ERROR]:":10} Cannot specify --refs_order when --no_alignment is True. Please remove "
-                         f"--no_alignment or remove --refs_order.")
+        # If refs_order is specified, no_per_sample_alignments_with_refs and no_per_gene_alignments_with_refs must be False
+        if args.no_per_sample_alignments_with_refs and args.no_per_gene_alignments_with_refs:
+            logger.error(f"{"[ERROR]:":10} Cannot specify --refs_order when --no_per_sample_alignments_with_refs and "
+                         f"--no_per_gene_alignments_with_refs is used!")
             utils.exit_program()
         
         # Get available order directories under the resolved base data directory
@@ -1033,10 +1172,10 @@ def get_references(args, gene_median_lengths, gene_synonyms=None, data_dir_base=
     
     # Check if custom reference folder is specified
     if args.custom_refs_folder:
-        # If custom folder is specified, no_alignment must be False
-        if args.no_alignment:
-            logger.error(f"{"[ERROR]:":10} Cannot specify --custom_refs_folder when --no_alignment is True. Please "
-                         f"remove --no_alignment or remove --custom_refs_folder.")
+        # If custom folder is specified, no_per_sample_alignments_with_refs and no_per_gene_alignments_with_refs must be False
+        if args.no_per_sample_alignments_with_refs and args.no_per_gene_alignments_with_refs:
+            logger.error(f"{"[ERROR]:":10} Cannot specify --custom_refs_folder when --no_per_sample_alignments_with_refs and "
+                         f"--no_per_gene_alignments_with_refs is used!")
             utils.exit_program()
         
         try:
@@ -1632,7 +1771,7 @@ def generate_cds_alignments(all_sample_results, ref_gene_seqrecords, output_dire
 
     
     # Create alignments directory with subfolder structure
-    outdir_alignments = os.path.join(output_directory, '03_alignments_with_refs', '01_per_sample_alignments')
+    outdir_alignments = os.path.join(output_directory, '03_alignments', '01_per_sample_alignments_with_refs')
     os.makedirs(outdir_alignments, exist_ok=True)
     
     # Prepare alignment tasks
@@ -1838,7 +1977,7 @@ def generate_rRNA_alignments(all_sample_results, ref_gene_seqrecords, output_dir
     logger.debug(f"{"[DEBUG]:":10} Starting rRNA alignment generation")
     
     # Create alignments directory with subfolder structure
-    outdir_alignments = os.path.join(output_directory, '03_alignments_with_refs', '01_per_sample_alignments')
+    outdir_alignments = os.path.join(output_directory, '03_alignments', '01_per_sample_alignments_with_refs')
     os.makedirs(outdir_alignments, exist_ok=True)
     
     # Prepare alignment tasks
@@ -1926,7 +2065,7 @@ def generate_tRNA_alignments(all_sample_results, ref_gene_seqrecords, output_dir
     logger.debug(f"{"[DEBUG]:":10} Starting tRNA alignment generation")
     
     # Create alignments directory with subfolder structure
-    outdir_alignments = os.path.join(output_directory, '03_alignments_with_refs', '01_per_sample_alignments')
+    outdir_alignments = os.path.join(output_directory, '03_alignments', '01_per_sample_alignments_with_refs')
     os.makedirs(outdir_alignments, exist_ok=True)
     
     # Prepare alignment tasks
@@ -2147,6 +2286,147 @@ def create_single_per_gene_alignment(task_data):
         return False, (e, traceback.format_exc())
 
 
+def create_single_sample_only_alignment(task_data):
+    """
+    Create alignment for a single gene across all samples (no reference sequences).
+    
+    Args:
+        task_data (dict): Dictionary containing all necessary data for alignment
+        
+    Returns:
+        tuple: (success, result) where success is bool and result is either success message or error info
+    """
+    try:
+        gene_name = task_data['gene_name']
+        all_sample_sequences = task_data['all_sample_sequences']
+        outdir_alignments = task_data['outdir_alignments']
+        threads = task_data['threads']
+        gene_type = task_data['gene_type']  # 'CDS', 'rRNA', or 'tRNA'
+
+        # Check if alignment file already exists and is not empty
+        alignment_file = os.path.join(outdir_alignments, f"{gene_name}_sample_only_alignment.fasta")
+        if utils.file_exists_and_not_empty(alignment_file):
+            return True, f"Skipped {gene_name} - sample-only alignment already exists"
+
+        if gene_type == 'CDS':
+            # Check for internal stop codons in sample sequences
+            has_internal_stops = False
+            for seqrecord in all_sample_sequences:
+                translated = utils.pad_seq(seqrecord)[0].translate()
+                if "*" in str(translated.seq)[:-1]:  # Exclude the last position
+                    has_internal_stops = True
+                    break
+                    
+            if has_internal_stops:
+                # Align nucleotide sequences directly using mafft
+                with tempfile.NamedTemporaryFile(mode='w', suffix='.fasta', delete=False) as temp_nucleotide:
+                    SeqIO.write(all_sample_sequences, temp_nucleotide, "fasta")
+                    temp_nucleotide_path = temp_nucleotide.name
+                
+                try:
+                    # Run MAFFT alignment
+                    subprocess.run(['mafft', '--auto', '--thread', str(threads), '--anysymbol', temp_nucleotide_path], 
+                                 stdout=open(alignment_file, 'w'), 
+                                 stderr=subprocess.PIPE, check=True)
+                    
+                    return True, f"Created nucleotide alignment for {gene_name} (sample sequences only)"
+                    
+                except Exception as e:
+                    return False, (e, traceback.format_exc())
+                
+                finally:
+                    if os.path.exists(temp_nucleotide_path):
+                        os.unlink(temp_nucleotide_path)
+                    
+            else:
+                # Write ungapped nucleotide seqs for backtranslation
+                with tempfile.NamedTemporaryFile(mode='w', suffix='.fasta', delete=False) as temp_nucleotide:
+                    for seqrecord in all_sample_sequences:
+                        seqrecord.seq = seqrecord.seq.replace("-", "")
+
+                    SeqIO.write(all_sample_sequences, temp_nucleotide, "fasta")
+                    temp_nucleotide_path = temp_nucleotide.name
+
+                # Create protein alignment using MAFFT, then backtranslate
+                with tempfile.NamedTemporaryFile(mode='w', suffix='.fasta', delete=False) as temp_protein:
+                    # Translate all seqrecords to protein
+                    for seqrecord in all_sample_sequences:
+                        seqrecord = utils.pad_seq(seqrecord)[0]
+                        seqrecord.seq = seqrecord.seq.translate()
+
+                    SeqIO.write(all_sample_sequences, temp_protein, "fasta")
+                    temp_protein_path = temp_protein.name
+
+                try:
+                    # Align proteins using MAFFT
+                    aligned_protein_file = os.path.join(outdir_alignments, f"{gene_name}_protein_aligned.fasta")
+                    subprocess.run(['mafft', '--auto', '--thread', str(threads), '--anysymbol', temp_protein_path], 
+                                 stdout=open(aligned_protein_file, 'w'), 
+                                 stderr=subprocess.PIPE, check=True)
+                    
+                    # Backtranslate using trimal
+                    subprocess.run(['trimal', '-backtrans', temp_nucleotide_path, '-in', aligned_protein_file, '-out', alignment_file, '-ignorestopcodon'], 
+                                 stderr=subprocess.PIPE, check=True)
+
+                    return True, f"Created backtranslated alignment for {gene_name} (sample sequences only)"
+                    
+                except Exception as e:
+                    return False, (e, traceback.format_exc())
+                
+                finally:
+                    if os.path.exists(temp_nucleotide_path):
+                        os.unlink(temp_nucleotide_path)
+                    if os.path.exists(temp_protein_path):
+                        os.unlink(temp_protein_path)
+                    if os.path.exists(aligned_protein_file):
+                        os.unlink(aligned_protein_file)
+        
+        elif gene_type == 'rRNA':
+            # Align nucleotide sequences directly using mafft
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.fasta', delete=False) as temp_nucleotide:
+                SeqIO.write(all_sample_sequences, temp_nucleotide, "fasta")
+                temp_nucleotide_path = temp_nucleotide.name
+            
+            try:
+                # Run MAFFT alignment
+                subprocess.run(['mafft', '--auto', '--thread', str(threads), '--anysymbol', temp_nucleotide_path], 
+                             stdout=open(alignment_file, 'w'), 
+                             stderr=subprocess.PIPE, check=True)
+                
+                return True, f"Created rRNA alignment for {gene_name} (sample sequences only)"
+                
+            except Exception as e:
+                return False, (e, traceback.format_exc())
+            
+            finally:
+                if os.path.exists(temp_nucleotide_path):
+                    os.unlink(temp_nucleotide_path)
+        
+        else:  # tRNA
+            # Align nucleotide sequences directly using mafft
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.fasta', delete=False) as temp_nucleotide:
+                SeqIO.write(all_sample_sequences, temp_nucleotide, "fasta")
+                temp_nucleotide_path = temp_nucleotide.name
+            
+            try:
+                # Run MAFFT alignment
+                subprocess.run(['mafft', '--auto', '--thread', str(threads), '--anysymbol', temp_nucleotide_path], 
+                             stdout=open(alignment_file, 'w'), 
+                             stderr=subprocess.PIPE, check=True)
+                
+                return True, f"Created tRNA alignment for {gene_name} (sample sequences only)"
+                
+            except Exception as e:
+                return False, (e, traceback.format_exc())
+            
+            finally:
+                if os.path.exists(temp_nucleotide_path):
+                    os.unlink(temp_nucleotide_path)
+        
+    except Exception as e:
+        return False, (e, traceback.format_exc())
+
+
 def generate_per_gene_alignments(all_sample_results, ref_gene_seqrecords, output_directory, pool_size, threads):
     """
     Create per-gene alignments that include all samples for each gene.
@@ -2164,7 +2444,7 @@ def generate_per_gene_alignments(all_sample_results, ref_gene_seqrecords, output
     logger.debug(f"{"[DEBUG]:":10} Starting per-gene alignment generation")
     
     # Create alignments directory with subfolder structure
-    outdir_alignments = os.path.join(output_directory, '03_alignments_with_refs', '02_per_gene_alignments')
+    outdir_alignments = os.path.join(output_directory, '03_alignments', '02_per_gene_alignments_with_refs')
     os.makedirs(outdir_alignments, exist_ok=True)
     
     # Collect all gene sequences from all samples
@@ -2284,9 +2564,168 @@ def generate_per_gene_alignments(all_sample_results, ref_gene_seqrecords, output
     logger.debug(f"{"[DEBUG]:":10} Per-gene alignment generation complete")
 
 
-def align_genes(all_sample_results, ref_gene_seqrecords, output_directory, pool_size, threads, refs_order):
+def generate_sample_only_alignments(all_sample_results, output_directory, pool_size, threads):
     """
-    Generate alignments for annotated genes with reference genes.
+    Create alignments using only sample sequences (no reference sequences).
+    
+    This function generates alignments by combining gene data from all samples without
+    using external reference sequences. It creates comprehensive alignments that show
+    the variation between samples for each gene.
+    
+    Args:
+        all_sample_results (dict): Dictionary of all sample results
+        output_directory (str): Directory to write alignment files
+        pool_size (int): Number of processes to use for multiprocessing
+        threads (int): Number of threads to use for each process
+
+    Returns:
+        None
+    """
+    logger.debug(f"{"[DEBUG]:":10} Starting sample-only alignment generation")
+    
+    # Create alignments directory with subfolder structure
+    outdir_alignments = os.path.join(output_directory, '03_alignments', '03_per_gene_alignments_sample_only')
+    os.makedirs(outdir_alignments, exist_ok=True)
+    
+    # Collect all gene sequences from all samples
+    gene_sequences = {}  # gene_name -> list of SeqRecord objects
+    gene_types = {}      # gene_name -> 'CDS', 'rRNA', or 'tRNA'
+    
+    for sample_name, result in all_sample_results.items():
+        if 'error' in result:
+            continue
+            
+        gene_cds_info = result.get('gene_cds_info', {})
+        gene_rRNA_info = result.get('gene_rRNA_info', {})
+        gene_tRNA_info = result.get('gene_tRNA_info', {})
+        
+        # Process CDS genes
+        for gene_name, cds_info_list in gene_cds_info.items():
+            # Extract base gene name (remove _copy_N suffix if present)
+            base_gene_name = gene_name.split('_copy_')[0]
+            
+            if base_gene_name not in gene_sequences:
+                gene_sequences[base_gene_name] = []
+                gene_types[base_gene_name] = 'CDS'
+            
+            for i, cds_info in enumerate(cds_info_list):
+                seq = cds_info['cds_seq']
+                # Extract original copy number from gene name if present
+                if '_copy_' in gene_name:
+                    copy_num = gene_name.split('_copy_')[1]
+                else:
+                    copy_num = str(i + 1)
+                seqrecord = SeqRecord(seq=seq, id=f"{sample_name}_{base_gene_name}_copy_{copy_num}", description=f"CDS from {sample_name}")
+                gene_sequences[base_gene_name].append(seqrecord)
+        
+        # Process rRNA genes
+        for gene_name, rRNA_info_list in gene_rRNA_info.items():
+            # Extract base gene name (remove _copy_N suffix if present)
+            base_gene_name = gene_name.split('_copy_')[0]
+            
+            if base_gene_name not in gene_sequences:
+                gene_sequences[base_gene_name] = []
+                gene_types[base_gene_name] = 'rRNA'
+            
+            for i, rRNA_info in enumerate(rRNA_info_list):
+                seq = rRNA_info['rRNA_seq']
+                # Extract original copy number from gene name if present
+                if '_copy_' in gene_name:
+                    copy_num = gene_name.split('_copy_')[1]
+                else:
+                    copy_num = str(i + 1)
+                seqrecord = SeqRecord(seq=seq, id=f"{sample_name}_{base_gene_name}_copy_{copy_num}", description=f"rRNA from {sample_name}")
+                gene_sequences[base_gene_name].append(seqrecord)
+        
+        # Process tRNA genes
+        for gene_name, tRNA_info_list in gene_tRNA_info.items():
+            # Extract base gene name (remove _copy_N suffix if present)
+            base_gene_name = gene_name.split('_copy_')[0]
+            
+            if base_gene_name not in gene_sequences:
+                gene_sequences[base_gene_name] = []
+                gene_types[base_gene_name] = 'tRNA'
+            
+            for i, tRNA_info in enumerate(tRNA_info_list):
+                seq = tRNA_info['tRNA_seq']
+                # Extract original copy number from gene name if present
+                if '_copy_' in gene_name:
+                    copy_num = gene_name.split('_copy_')[1]
+                else:
+                    copy_num = str(i + 1)
+                seqrecord = SeqRecord(seq=seq, id=f"{sample_name}_{base_gene_name}_copy_{copy_num}", description=f"tRNA from {sample_name}")
+                gene_sequences[base_gene_name].append(seqrecord)
+    
+    # Prepare alignment tasks for all genes (no reference filtering)
+    alignment_tasks = []
+    single_sequence_genes = []
+    multi_sequence_genes = []
+    
+    for gene_name, sample_sequences in gene_sequences.items():
+        if len(sample_sequences) >= 2:  # Only align if we have at least 2 sequences
+            gene_type = gene_types[gene_name]
+            multi_sequence_genes.append(gene_name)
+
+            alignment_tasks.append({
+                'gene_name': gene_name,
+                'all_sample_sequences': sample_sequences,
+                'outdir_alignments': outdir_alignments,
+                'threads': threads,
+                'gene_type': gene_type
+            })
+        else:
+            single_sequence_genes.append(gene_name)
+            logger.debug(f"{"[DEBUG]:":10} Skipping gene {gene_name} - only {len(sample_sequences)} sequence(s) found")
+    
+    # Report comprehensive statistics
+    total_genes = len(gene_sequences)
+    logger.info(f"{"[INFO]:":10} Sample-only alignment analysis summary:")
+    logger.info(f"{"":10} Total genes found: {total_genes}")
+    logger.info(f"{"":10} Genes with multiple sequences: {len(multi_sequence_genes)}")
+    logger.info(f"{"":10} Genes with single sequences: {len(single_sequence_genes)}")
+    
+    if single_sequence_genes:
+        logger.info(f"{"":10} Single-sequence genes (not aligned): {', '.join(sorted(single_sequence_genes))}")
+    
+    if not alignment_tasks:
+        logger.warning(f"{"[WARNING]:":10} No sample-only alignment tasks found")
+        return
+    
+    logger.debug(f"{"[DEBUG]:":10} Found {len(alignment_tasks)} sample-only alignment tasks")
+    
+    # Process alignments with multiprocessing and progress bar
+    logger.info(f"{"[INFO]:":10} Processing {len(alignment_tasks)} sample-only alignment tasks with {pool_size} processes and {threads} threads per process")
+    with ProcessPoolExecutor(max_workers=pool_size) as executor:
+        # Submit all tasks
+        future_to_task = {
+            executor.submit(create_single_sample_only_alignment, task): task['gene_name']
+            for task in alignment_tasks
+        }
+        
+        # Process results with progress bar
+        for future in tqdm(as_completed(future_to_task), total=len(future_to_task), desc=f"{"[INFO]:":10} {"Generating sample-only alignments":<40}", file=sys.stdout):
+            
+            task_id = future_to_task[future]
+
+            success, result = future.result()
+            
+            if success:
+                logger.debug(f"{"[DEBUG]:":10} {task_id}: {result}")
+            else:
+                utils.log_manager.handle_error(result[0], result[1], "generate_sample_only_alignments()", task_id)
+
+    logger.debug(f"{"[DEBUG]:":10} Sample-only alignment generation complete")
+
+
+def align_genes(all_sample_results, ref_gene_seqrecords, output_directory, pool_size, threads, 
+                no_per_sample_alignments_with_refs, no_per_gene_alignments_with_refs, no_sample_only_alignments):
+    """
+    Generate alignments for annotated genes.
+    
+    This function generates all types of alignments by default:
+    1. Per-sample alignments with reference genes (unless --no_per_sample_alignments_with_refs)
+    2. Per-gene alignments with reference genes (unless --no_per_gene_alignments_with_refs)
+    3. Sample-only alignments (unless --no_sample_only_alignments)
     
     Args:
         all_sample_results (dict): Results from gene checking (contains sequence_gene_data for each sample)
@@ -2294,17 +2733,64 @@ def align_genes(all_sample_results, ref_gene_seqrecords, output_directory, pool_
         output_directory (str): Directory to write the output files
         pool_size (int): Number of processes to use for multiprocessing
         threads (int): Number of threads to use for each process
-        refs_order (list): List of orders to use for reference genes
+        no_per_sample_alignments_with_refs (bool): Whether to disable per-sample alignments with references
+        no_per_gene_alignments_with_refs (bool): Whether to disable per-gene alignments with references
+        no_sample_only_alignments (bool): Whether to disable sample-only alignments
     """
     
-    logger.info(f"{"[INFO]:":10} Generating gene alignments...")
+    # Generate reference-based alignments if references are available and not disabled
+    if ref_gene_seqrecords:
+        logger.info(f"{"[INFO]:":10} Generating reference-based alignments...")
+        
+        # Generate per-sample alignments unless disabled
+        if not no_per_sample_alignments_with_refs:
+            generate_cds_alignments(all_sample_results, ref_gene_seqrecords, output_directory, pool_size, threads)
+            generate_rRNA_alignments(all_sample_results, ref_gene_seqrecords, output_directory, pool_size, threads)
+            generate_tRNA_alignments(all_sample_results, ref_gene_seqrecords, output_directory, pool_size, threads)
+        else:
+            logger.info(f"{"[INFO]:":10} Per-sample alignments with references disabled by user")
+        
+        # Generate per-gene alignments (all samples combined) unless disabled
+        if not no_per_gene_alignments_with_refs:
+            generate_per_gene_alignments(all_sample_results, ref_gene_seqrecords, output_directory, pool_size, threads)
+        else:
+            logger.info(f"{"[INFO]:":10} Per-gene alignments with references disabled by user")
+    else:
+        logger.info(f"{"[INFO]:":10} No reference sequences available - skipping reference-based alignments")
     
-    generate_cds_alignments(all_sample_results, ref_gene_seqrecords, output_directory, pool_size, threads)
-    generate_rRNA_alignments(all_sample_results, ref_gene_seqrecords, output_directory, pool_size, threads)
-    generate_tRNA_alignments(all_sample_results, ref_gene_seqrecords, output_directory, pool_size, threads)
-    generate_per_gene_alignments(all_sample_results, ref_gene_seqrecords, output_directory, pool_size, threads)
+    # Generate sample-only alignments unless disabled
+    if not no_sample_only_alignments:
+        logger.info(f"{"[INFO]:":10} Generating sample-only gene alignments...")
+        generate_sample_only_alignments(all_sample_results, output_directory, pool_size, threads)
+    else:
+        logger.info(f"{"[INFO]:":10} Sample-only alignments disabled by user")
     
-    logger.info(f"{"[INFO]:":10} Gene alignment generation complete")
+    # Final comprehensive summary
+    completion_message = f"Gene alignment generation complete. "
+    
+    per_sample_ref_alignments_enabled = ref_gene_seqrecords and not no_per_sample_alignments_with_refs
+    per_gene_ref_alignments_enabled = ref_gene_seqrecords and not no_per_gene_alignments_with_refs
+    sample_only_enabled = not no_sample_only_alignments
+    
+    if per_sample_ref_alignments_enabled and per_gene_ref_alignments_enabled and sample_only_enabled:
+        completion_message += "Generated all alignment types"
+    elif per_sample_ref_alignments_enabled and per_gene_ref_alignments_enabled:
+        completion_message += "Generated reference-based alignments only"
+    elif per_sample_ref_alignments_enabled and sample_only_enabled:
+        completion_message += "Generated per-sample reference alignments and sample-only alignments"
+    elif per_gene_ref_alignments_enabled and sample_only_enabled:
+        completion_message += "Generated per-gene reference alignments and sample-only alignments"
+    elif per_sample_ref_alignments_enabled:
+        completion_message += "Generated per-sample reference alignments only"
+    elif per_gene_ref_alignments_enabled:
+        completion_message += "Generated per-gene reference alignments only"
+    elif sample_only_enabled:
+        completion_message += "Generated sample-only alignments only"
+    else:
+        completion_message += "No alignments generated (all types disabled by user)"
+
+    logger.info(f"{"[INFO]:":10} {completion_message}")
+    
     utils.log_separator(logger)
 
 
@@ -2490,8 +2976,52 @@ def linearise_genome_upstream_gene(gbk_file, fasta_file, output_dir, sample_name
         return fasta_file
 
 
+def fix_genbank_topology(gbk_file, correct_topology, logger=None):
+    """
+    Fix the topology in a GenBank file's LOCUS line to match the correct topology.
+    
+    Args:
+        gbk_file (str): Path to the GenBank file to fix
+        correct_topology (str): The correct topology ('linear' or 'circular')
+        logger: Logger instance (optional)
+    
+    Returns:
+        bool: True if the file was successfully fixed, False otherwise
+    """
+    try:
+        # Read the file
+        with open(gbk_file, 'r') as f:
+            lines = f.readlines()
+        
+        # Find and fix the LOCUS line
+        for i, line in enumerate(lines):
+            if line.startswith('LOCUS'):
+                # Replace 'circular' or 'linear' with the correct topology
+                if 'circular' in line:
+                    lines[i] = line.replace('circular', correct_topology)
+                elif 'linear' in line:
+                    lines[i] = line.replace('linear', correct_topology)
+                else:
+                    if logger:
+                        logger.warning(f"{"[WARNING]:":10} Could not find topology in LOCUS line: {line.strip()}")
+                    continue
+                break
+        
+        # Write the corrected file
+        with open(gbk_file, 'w') as f:
+            f.writelines(lines)
+        
+        if logger:
+            logger.debug(f"{"[DEBUG]:":10} Fixed topology in {os.path.basename(gbk_file)} to {correct_topology}")
+          
+    except Exception as e:
+        if logger:
+            logger.error(f"{"[ERROR]:":10} Failed to fix topology in {gbk_file}: {str(e)}")
+        raise e
+
+
 def process_single_sequence(fasta_file, output_dir, sequence_name, chloe_project_dir, linearise_genes, 
-                            metadata_dict, original_fasta_name, logger=None):
+                            metadata_dict, original_fasta_name, no_filter, logger=None):
     """
     Process a single sequence file with Chloë annotation.
     
@@ -2504,6 +3034,7 @@ def process_single_sequence(fasta_file, output_dir, sequence_name, chloe_project
         linearise_genes (list): List of genes to try for linearisation
         metadata_dict (dict): Metadata dictionary
         original_fasta_name (str): Original multi-sequence filename for metadata lookup
+        no_filter (bool): Whether to use the `--no-filter` flag in the chloe annotate command
         logger: Logger instance for logging messages
         
     Returns:
@@ -2540,32 +3071,40 @@ def process_single_sequence(fasta_file, output_dir, sequence_name, chloe_project
 
     chloe_project = f'--project={chloe_project_dir}'
     chloe_script = os.path.join(chloe_project_dir, 'chloe.jl')
-    
+
     # Run chloe annotate command
     cmd = [
         'julia',
         chloe_project,
         chloe_script,
         'annotate',
-        '--no-filter',
         '--no-transform',
         '--gbk',
-        '--output',
-        output_dir,
-        fasta_file
     ]
+
+    if no_filter:
+        cmd.append('--no-filter')
+
+    cmd.append('--output')
+    cmd.append(output_dir)
+    cmd.append(fasta_file)
 
     # Execute annotation workflow
     if not has_original_annotation:
         # Do initial annotation
         logger.debug(f"{"[INFO]:":10} Performing initial annotation for {sequence_name}")
 
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            check=True
-        )
+        try:
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                check=True
+            )
+
+        except subprocess.CalledProcessError as e:
+            logger.debug(f"{"[DEBUG]:":10} Error performing initial annotation for {sequence_name}: {str(e)}")
+            return False, f'Error performing initial annotation for {sequence_name}', (str(e), e.stdout, e.stderr)
 
         # Rename original annotation files to preserve original annotation
         if os.path.exists(output_gbk):
@@ -2604,40 +3143,47 @@ def process_single_sequence(fasta_file, output_dir, sequence_name, chloe_project
         if output_fasta_linearised != fasta_file:
             successful_linearisation = True
             # Re-run chloe with linearised fasta
-            cmd[9] = output_fasta_linearised  # Replace the fasta file in the command
+            cmd[-1] = output_fasta_linearised  # Replace the fasta file in the command
 
-            if logger:
-                logger.debug(f"{"[DEBUG]:":10} Re-annotating {sequence_name} with linearised sequence")
-            
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                check=True
-            )
+            logger.debug(f"{"[DEBUG]:":10} Re-annotating {sequence_name} with linearised sequence")
 
-            if logger:
-                logger.debug(f"{"[DEBUG]:":10} Re-annotation complete for {sequence_name}")
+            try:
+                result = subprocess.run(
+                    cmd,
+                    capture_output=True,
+                    text=True,
+                    check=True
+                )
+
+            except subprocess.CalledProcessError as e:
+                logger.debug(f"{"[DEBUG]:":10} Error re-annotating {sequence_name}: {str(e)}")
+                return False, f'Error re-annotating {sequence_name}', (str(e), e.stdout, e.stderr)
+        
+            logger.debug(f"{"[DEBUG]:":10} Re-annotation complete for {sequence_name}")
 
     elif has_original_annotation and has_linearised_annotation_and_fasta:
         successful_linearisation = True
 
+    # Fix topology in the appropriate GenBank files based on metadata
+    if should_linearise and successful_linearisation:
+        fix_genbank_topology(output_gbk_linearised, topology, logger)
+    else:
+        fix_genbank_topology(output_gbk_original, topology, logger)
+
     # Return the appropriate file paths
     if should_linearise and successful_linearisation:
-        return {
+        return True, {
             'gbk': output_gbk_linearised,
             'gff': output_gff_linearised,
-            # 'fasta': output_fasta_linearised
-        }
+        }, []
     else:
-        return {
+        return True, {
             'gbk': output_gbk_original,
             'gff': output_gff_original,
-            # 'fasta': fasta_file
-        }
+        }, []
 
 
-def annotate_genomes(genome_fasta_dir, output_directory, chloe_project_dir,
+def annotate_genomes(genome_fasta_dir, output_directory, chloe_project_dir, no_filter,
                      linearise_genes=['psbA'],  metadata_dict=None, pool_size=1, log_queue=None):
     """
     Annotate genome fasta files using chloe annotate command.
@@ -2682,10 +3228,16 @@ def annotate_genomes(genome_fasta_dir, output_directory, chloe_project_dir,
     logger.info(f"{"[INFO]:":10} Found {len(fasta_files)} fasta files to annotate:")
     for fasta_file in fasta_files:
         logger.info(f"{" ":10} {os.path.basename(fasta_file)}")
+
+    utils.log_separator(logger)
+
+    check_input_fasta_files(genome_fasta_dir)
+
     utils.log_separator(logger)
     time.sleep(0.1)  # As tqdm output is not written to the queue, we need to sleep to ensure the logger messages have time to be written 
 
     annotated_genomes = dict({})
+    seqs_with_annotation_errors = dict()
     
     # Process files with multiprocessing
     logger.info(f"{"[INFO]:":10} Processing {len(fasta_files)} FASTA files with {pool_size} processes")
@@ -2694,7 +3246,7 @@ def annotate_genomes(genome_fasta_dir, output_directory, chloe_project_dir,
         # Submit all tasks
         future_to_file = {
             executor.submit(process_single_fasta_file, fasta_file, annotated_genomes_dir, chloe_project_dir,
-                            linearise_genes, metadata_dict, log_queue): fasta_file
+                            linearise_genes, metadata_dict, no_filter, log_queue): fasta_file
             for fasta_file in fasta_files
         }
         
@@ -2706,20 +3258,37 @@ def annotate_genomes(genome_fasta_dir, output_directory, chloe_project_dir,
             success, result = future.result()
                 
             if success:
-                sample_name, sample_data = result
+                sample_name, sample_data, seqs_with_errors = result  # seqs_with_errors is a list of tuples (seq_result, seq_error_tuple)
+
+                if seqs_with_errors:
+                    seqs_with_annotation_errors[sample_name] = seqs_with_errors
                 annotated_genomes[sample_name] = sample_data
                 logger.debug(f"{"[DEBUG]:":10} Successfully processed {sample_name}")
             else:
                 utils.log_manager.handle_error(result[0], result[1], 'annotate_genomes()', fasta_file)
-                                               
-    utils.log_separator(logger)
+
+        if seqs_with_annotation_errors:
+            for sample_name, seqs_with_errors in seqs_with_annotation_errors.items():
+                logger.warning(f"{"[WARNING]:":10} Sample {sample_name} had {len(seqs_with_errors)} sequences with "
+                               f"annotation errors:")
+                for seq_error in seqs_with_errors:
+                    assert len(seq_error) == 2
+                    logger.warning(f"{"":10} {seq_error[0]}")
+                    logger.debug(f"{"":10} {seq_error[1][0]}")
+                    logger.debug(f"{"":10} {seq_error[1][1]}")
+                    logger.debug(f"{"":10} {seq_error[1][2]}")
+
+            logger.warning("")
+            logger.warning(f"{"":10} These sequences were not annotated and will not be used in the pipeline")
+            
+    utils.log_separator(logger) 
     time.sleep(0.1)
 
     return annotated_genomes
 
 
 def process_single_fasta_file(fasta_file, annotated_genomes_dir, chloe_project_dir, linearise_genes,
-                              metadata_dict, log_queue=None):
+                              metadata_dict, no_filter, log_queue=None):
     """
     Process a single FASTA file with annotation (worker function for multiprocessing).
     
@@ -2730,6 +3299,7 @@ def process_single_fasta_file(fasta_file, annotated_genomes_dir, chloe_project_d
         chloe_script_path (str): Chloë script path
         linearise_genes (list): List of genes to try for linearisation
         metadata_dict (dict): Metadata dictionary
+        no_filter (bool): Whether to use the `--no-filter` flag in the chloe annotate command
         log_queue (queue.Queue, optional): Multiprocessing-safe queue for logging
         
     Returns:
@@ -2737,6 +3307,8 @@ def process_single_fasta_file(fasta_file, annotated_genomes_dir, chloe_project_d
     """
     try:
         worker_logger = utils.setup_worker_logger(__name__, log_queue)
+
+        seqs_with_errors = []
         
         # Get the basename and filename prefix
         input_basename = os.path.basename(fasta_file)
@@ -2780,7 +3352,7 @@ def process_single_fasta_file(fasta_file, annotated_genomes_dir, chloe_project_d
                 worker_logger.debug(f"{"[DEBUG]:":10} Processing sequence {seq_idx}/{sequence_count}: {seq_name}")
                 
                 # Process this individual sequence
-                seq_result = process_single_sequence(
+                success, seq_result, seq_error_tuple = process_single_sequence(
                     seq_file, 
                     output_sample_dir, 
                     seq_name, 
@@ -2788,11 +3360,14 @@ def process_single_fasta_file(fasta_file, annotated_genomes_dir, chloe_project_d
                     linearise_genes, 
                     metadata_dict, 
                     input_basename,  # Original multi-sequence filename for metadata lookup
+                    no_filter,
                     worker_logger
                 )
                 
-                if seq_result:
+                if success:
                     sample_data['sequences'][seq_name] = seq_result
+                else:
+                    seqs_with_errors.append((seq_result, seq_error_tuple))  # Here seq_result is an error string
             
             # Store the multi-sequence sample info
             # For multi-sequence, collect all individual sequence files
@@ -2809,7 +3384,7 @@ def process_single_fasta_file(fasta_file, annotated_genomes_dir, chloe_project_d
                 sample_data['gbk'] = all_gbk_files
                 sample_data['gff'] = all_gff_files
             
-            return True, (filename_prefix_no_dots, sample_data)
+            return True, (filename_prefix_no_dots, sample_data, seqs_with_errors)
         
         else:
             # Single sequence FASTA - process as before
@@ -2823,7 +3398,7 @@ def process_single_fasta_file(fasta_file, annotated_genomes_dir, chloe_project_d
             }
             
             # Process single sequence
-            result = process_single_sequence(
+            success, seq_result, seq_error_tuple = process_single_sequence(
                 fasta_file, 
                 os.path.join(annotated_genomes_dir, filename_prefix_no_dots), 
                 filename_prefix, 
@@ -2831,13 +3406,16 @@ def process_single_fasta_file(fasta_file, annotated_genomes_dir, chloe_project_d
                 linearise_genes, 
                 metadata_dict, 
                 input_basename,
+                no_filter,
                 worker_logger
             )
             
-            if result:
-                sample_data.update(result)
+            if success:
+                sample_data.update(seq_result)
+            else:
+                seqs_with_errors.append((seq_result, seq_error_tuple))
             
-            return True, (filename_prefix_no_dots, sample_data)
+            return True, (filename_prefix_no_dots, sample_data, seqs_with_errors)
             
     except Exception as e:
         return False, (e, traceback.format_exc())
@@ -3442,6 +4020,8 @@ def query_intergenic_regions(annotated_genomes_dict, output_directory, min_inter
     
     # Process samples with multiprocessing and progress bar
     logger.info(f"{"[INFO]:":10} Processing {len(sample_data_list)} samples with {pool_size} processes")
+    no_intergenic_regions = []
+
     with ProcessPoolExecutor(max_workers=pool_size) as executor:
         # Submit all tasks
         future_to_sample = {
@@ -3453,20 +4033,21 @@ def query_intergenic_regions(annotated_genomes_dict, output_directory, min_inter
         for future in tqdm(as_completed(future_to_sample), total=len(future_to_sample), desc=f"{"[INFO]:":10} {"Processing intergenic regions":<40}", file=sys.stdout):
             sample_name = future_to_sample[future]
             
-            try:
-                success, result = future.result()
-                
-                if success:
-                    blast_results, genome_report_file = result
+            success, result = future.result()
+            
+            if success:
+                blast_results, genome_report_file = result
+
+                if blast_results == 'no_intergenic_regions':
+                    no_intergenic_regions.append(sample_name)
+                else:
                     all_results.extend(blast_results)
                     logger.debug(f"{"[DEBUG]:":10} Completed intergenic analysis for {sample_name}: {len(blast_results)} BLAST hits")
-                else:
-                    utils.log_manager.handle_error(result[0], "Intergenic region analysis", sample_name)
+            else:
+                utils.log_manager.handle_error(result[0], "Intergenic region analysis", sample_name)
                     
-            except Exception as e:
-                logger.error(f"{"[ERROR]:":10} Error processing {sample_name}: {str(e)}")
-                logger.error(traceback.format_exc())
-                continue
+    if no_intergenic_regions:
+        logger.info(f"{"[INFO]:":10} No intergenic regions found for {len(no_intergenic_regions)} samples: {', '.join(no_intergenic_regions)}")
 
     # Write combined report
     if all_results:
@@ -3480,13 +4061,16 @@ def query_intergenic_regions(annotated_genomes_dict, output_directory, min_inter
     utils.log_separator(logger)
 
 
-def extract_intergenic_regions(gbk_file, min_length=50, debug_intergenic=False, logger=None):
+def extract_intergenic_regions(gbk_file, min_length=50, debug_intergenic=False, debug_output_dir=None, logger=None):
     """
     Extract intergenic regions from a GenBank file.
     
     Args:
         gbk_file (str): Path to GenBank file
         min_length (int): Minimum length of intergenic region to extract
+        debug_intergenic (bool): Whether to write debug FASTA files
+        debug_output_dir (str, optional): Directory to write debug FASTA files. If None, writes to same directory as GenBank file
+        logger: Logger instance for logging messages
     
     Returns:
         list: List of dictionaries containing intergenic region information
@@ -3674,7 +4258,9 @@ def extract_intergenic_regions(gbk_file, min_length=50, debug_intergenic=False, 
     
     # Write debug FASTA file if requested (for end regions)
     if debug_intergenic and intergenic_regions:
-        debug_fasta_file = gbk_file.replace('.gbk', '_intergenic_debug.fasta')
+        sample_name = os.path.splitext(os.path.basename(gbk_file))[0]
+        debug_fasta_file = os.path.join(debug_output_dir, f"{sample_name}_intergenic_debug.fasta")
+
         with open(debug_fasta_file, 'w') as f:
             for region in intergenic_regions:
                 f.write(f">{region['region_id']}\n{region['sequence']}\n")
@@ -3739,10 +4325,10 @@ def process_single_genome_intergenic(sample_data, log_queue=None):
 
             # Extract intergenic regions
             intergenic_regions = extract_intergenic_regions(gbk_file, min_intergenic_length,
-                                                            debug_intergenic, worker_logger)
+                                                            debug_intergenic, intergenic_output_dir, worker_logger)
             
             if not intergenic_regions:
-                worker_logger.warning(f"{"[WARNING]:":10} No intergenic regions found for {sequence_id}")
+                worker_logger.debug(f"{"[DEBUG]:":10} No intergenic regions found for {sequence_id}")
                 continue
 
             # BLAST intergenic regions - use sequence_id to include sequence information
@@ -3751,7 +4337,7 @@ def process_single_genome_intergenic(sample_data, log_queue=None):
             all_blast_results.extend(blast_results)
         
         if not all_blast_results:
-            return False, (ValueError(f"No intergenic regions found for {sample_name}"), traceback.format_exc())
+            return True, ('no_intergenic_regions', f'No intergenic regions found for {sample_name}')
 
         # Write individual genome report (single report per sample)
         genome_report_file = os.path.join(intergenic_output_dir, f"{sample_name}_intergenic_blast_results.tsv")
@@ -4281,6 +4867,8 @@ def check_pipeline(args):
     2. Gene validation against reference median lengths
     3. EMBL format conversion (with optional metadata)
     4. Multiple sequence alignment generation (if not disabled)
+       - With reference sequences (default)
+       - Additional sample-only alignments (if --alignments_no_refs specified)
     5. Intergenic region analysis (if not disabled)
     
     Args:
@@ -4290,7 +4878,10 @@ def check_pipeline(args):
             - metadata_tsv (str, optional): Path to metadata TSV file for EMBL conversion
             - min_length_percentage (float): Minimum acceptable gene length as percentage of median
             - max_length_percentage (float): Maximum acceptable gene length as percentage of median
-            - no_alignment (bool): Whether to skip alignment generation
+            - no_per_sample_alignments_with_refs (bool): Whether to disable per-sample alignments with references
+            - no_per_gene_alignments_with_refs (bool): Whether to disable per-gene alignments with references
+            - no_sample_only_alignments (bool): Whether to disable sample-only alignments
+            - alignments_no_refs (bool): Whether to generate alignments using only sample sequences (no references)
             - skip_intergenic_analysis (bool): Whether to skip intergenic region analysis
             - pool (int): Number of processes for parallel processing
             - threads (int): Number of threads per process
@@ -4343,7 +4934,7 @@ def check_pipeline(args):
         # Load gene synonyms from resolved data directory
         gene_synonyms = load_gene_synonyms(data_dir_base=data_dir_base)
 
-        # Check no_alignment and refs_order
+        # Get reference sequences
         ref_gene_seqrecords = get_references(args, gene_median_lengths, gene_synonyms, data_dir_base=data_dir_base)
 
         # Parse required metadata TSV file
@@ -4358,6 +4949,25 @@ def check_pipeline(args):
         # Load annotated GenBank files
         annotated_genomes_dict = load_annotated_genbank_files(args.annotated_genbank_dir, args.output_directory, logger)
 
+        # # Fix topology in GenBank files based on metadata
+        # if metadata_dict:
+        #     logger.info(f"{"[INFO]:":10} Fixing topology in GenBank files based on metadata...")
+        #     for sample_name, genome_info in annotated_genomes_dict.items():
+        #         if 'error' in genome_info:
+        #             continue
+                    
+        #         input_filename = genome_info.get('input_filename', '')
+        #         if input_filename in metadata_dict:
+        #             correct_topology = metadata_dict[input_filename].get('linear_or_circular', 'circular')
+                    
+        #             # Fix topology in GenBank files (handle both single files and lists)
+        #             gbk_files = genome_info.get('gbk', [])
+        #             if isinstance(gbk_files, list):
+        #                 for gbk_file in gbk_files:
+        #                     fix_genbank_topology(gbk_file, correct_topology, logger)
+        #             else:
+        #                 fix_genbank_topology(gbk_files, correct_topology, logger)
+
         # Check genes and write reports
         all_sample_results = check_genes(gene_median_lengths, annotated_genomes_dict, args.min_length_percentage,
                                          args.max_length_percentage, args.report_directory, log_queue, args.pool,
@@ -4367,9 +4977,8 @@ def check_pipeline(args):
         convert_gbk_to_embl(annotated_genomes_dict, args.output_directory, metadata_dict=metadata_dict)
 
         # Generate alignments if not disabled
-        if not args.no_alignment:
-            align_genes(all_sample_results, ref_gene_seqrecords, args.output_directory, args.pool, args.threads,
-                        args.refs_order)
+        align_genes(all_sample_results, ref_gene_seqrecords, args.output_directory, args.pool, args.threads,
+                    args.no_per_sample_alignments_with_refs, args.no_per_gene_alignments_with_refs, args.no_sample_only_alignments)
 
         # Query intergenic regions
         if not args.skip_intergenic_analysis:
@@ -4419,6 +5028,8 @@ def main(args):
     3. Gene validation against reference median lengths
     4. EMBL format conversion with metadata integration
     5. Multiple sequence alignment generation
+       - With reference sequences (default)
+       - Additional sample-only alignments (if --alignments_no_refs specified)
     6. Intergenic region analysis and BLAST searching
     
     Args:
@@ -4430,7 +5041,10 @@ def main(args):
             - linearise_gene (list): Genes to use for genome linearization
             - min_length_percentage (float): Minimum acceptable gene length as percentage of median
             - max_length_percentage (float): Maximum acceptable gene length as percentage of median
-            - no_alignment (bool): Whether to skip alignment generation
+            - no_per_sample_alignments_with_refs (bool): Whether to disable per-sample alignments with references
+            - no_per_gene_alignments_with_refs (bool): Whether to disable per-gene alignments with references
+            - no_sample_only_alignments (bool): Whether to disable sample-only alignments
+            - alignments_no_refs (bool): Whether to generate alignments using only sample sequences (no references)
             - skip_intergenic_analysis (bool): Whether to skip intergenic region analysis
             - pool (int): Number of processes for parallel processing
             - threads (int): Number of threads per process
@@ -4484,7 +5098,7 @@ def main(args):
         # Load gene synonyms from resolved data directory
         gene_synonyms = load_gene_synonyms(data_dir_base=data_dir_base)
 
-        # Check no_alignment and refs_order
+        # Get reference sequences
         ref_gene_seqrecords = get_references(args, gene_median_lengths, gene_synonyms, data_dir_base=data_dir_base)
 
         # Parse required metadata TSV file
@@ -4498,10 +5112,11 @@ def main(args):
             args.genome_fasta_dir,
             args.output_directory,
             args.chloe_project_dir,
+            args.no_filter,
             validated_linearise_genes,
             metadata_dict,
             args.pool,
-            log_queue
+            log_queue,
         )
         
         # Check genes and write reports
@@ -4513,9 +5128,8 @@ def main(args):
         convert_gbk_to_embl(annotated_genomes_dict, args.output_directory, metadata_dict=metadata_dict)
 
         # Generate alignments if not disabled
-        if not args.no_alignment:
-            align_genes(all_sample_results, ref_gene_seqrecords, args.output_directory, args.pool, args.threads,
-                        args.refs_order)
+        align_genes(all_sample_results, ref_gene_seqrecords, args.output_directory, args.pool, args.threads,
+                    args.no_per_sample_alignments_with_refs, args.no_per_gene_alignments_with_refs, args.no_sample_only_alignments)
 
         # Query intergenic regions
         if not args.skip_intergenic_analysis:
