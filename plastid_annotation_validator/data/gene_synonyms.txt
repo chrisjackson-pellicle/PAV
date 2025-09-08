@@ -375,7 +375,7 @@ tRNA-Cys (GCA) = trnC-GCA
 trnC = trnC-GCA
 trnC (GCA) = trnC-GCA
 trnC(GCA) = trnC-GCA
-trnC-ACA = trnC-GCA
+# trnC-ACA = trnC-GCA # present in Adinandra megaphylla?
 trnC-GCA = trnC-GCA
 trnC_GCA = trnC-GCA
 
@@ -385,10 +385,11 @@ trnD = trnD-GUC
 trnD (GUC) = trnD-GUC
 trnD(GTC) = trnD-GUC
 trnD(GUC) = trnD-GUC
-trnD-GAC = trnD-GUC
 trnD-GTC = trnD-GUC
 trnD-GUC = trnD-GUC
 trnD_GUC = trnD-GUC
+# anti-codon naming convention:
+trnD-GAC = trnD-GUC
 
 # trnE-UUC (tRNA-Glu)
 tRNA-Glu (UUC) = trnE-UUC
@@ -396,12 +397,12 @@ trnE = trnE-UUC
 trnE (UUC) = trnE-UUC
 trnE(TTC) = trnE-UUC
 trnE(UUC) = trnE-UUC
-trnE-GAA = trnF-GAA
-trnE-GAU = trnI-GAU
+# trnE-GAA = trnF-GAA # error?
+# trnE-GAU = trnI-GAU # error?
 trnE-TTC = trnE-UUC
 trnE-UUC = trnE-UUC
 trnE_UUC = trnE-UUC
-trnI-UUC = trnE-UUC
+# trnI-UUC = trnE-UUC # error?
 
 # trnF-GAA (tRNA-Phe)
 tRNA-Phe (GAA) = trnF-GAA
@@ -416,20 +417,20 @@ tRNA-Gly (GCC) = trnG-GCC
 trnG = trnG-GCC
 trnG (GCC) = trnG-GCC
 trnG(GCC) = trnG-GCC
-trnG-CGA = trnG-GCC
+# trnG-CGA = trnG-GCC # error?
 trnG-GCC = trnG-GCC
 trnG_GCC = trnG-GCC
 trnK-GCC = trnG-GCC
 
 # trnG-UCC (tRNA-Gly)
 tRNA-Gly (UCC) = trnG-UCC
-tRNA-Gly(UUC) = trnE-UUC
+# tRNA-Gly(UUC) = trnE-UUC # error?
 trnG (UCC) = trnG-UCC
 trnG(UCC) = trnG-UCC
 trnG-TCC = trnG-UCC
 trnG-UCC = trnG-UCC
 trnG-UCC_gene = trnG-UCC
-trnG-UCU = trnR-UCU
+# trnG-UCU = trnR-UCU # error?
 trnG_UCC = trnG-UCC
 trnS-UCC = trnG-UCC
 
@@ -437,36 +438,37 @@ trnS-UCC = trnG-UCC
 tRNA-His (GUG) = trnH-GUG
 trnH = trnH-GUG
 trnH (GUG) = trnH-GUG
-trnH(CAU) = trnM-CAU
+# trnH(CAU) = trnM-CAU # error?
 trnH(GTG) = trnH-GUG
 trnH(GUG) = trnH-GUG
-trnH-CAC = trnH-GUG
-trnH-CAU = trnM-CAU
+# trnH-CAU = trnM-CAU # error?
 trnH-GTG = trnH-GUG
 trnH-GUG = trnH-GUG
 trnH_GUG = trnH-GUG
+# anti-codon naming convention:
+trnH-CAC = trnH-GUG
 
 # trnI-CAU (tRNA-Ile)
 tRNA-Ile (CAU) = trnI-CAU
 trnI = trnI-CAU
 trnI (CAU) = trnI-CAU
 trnI(CAU) = trnI-CAU
-trnI(GAT) = trnI-GAU
 trnI-AUC = trnI-CAU
 trnI-CAT = trnI-CAU
 trnI-CAU = trnI-CAU
 trnI-UAU = trnI-CAU
 trnI_CAU = trnI-CAU
-trnI(GAU) = trnI-GAU
 
 # trnI-GAU (tRNA-Ile)
 tRNA-Ile (GAU) = trnI-GAU
 trnI (GAU) = trnI-GAU
+trnI(GAU) = trnI-GAU
 trnI-GAT = trnI-GAU
+trnI(GAT) = trnI-GAU
 trnI-GAU = trnI-GAU
 trnI_GAU = trnI-GAU
-trnL-GAU = trnI-GAU
-trnl-GAT = trnI-GAU
+# trnL-GAU = trnI-GAU # error?
+# trnl-GAT = trnI-GAU # error?
 
 # trnK-UUU (tRNA-Lys)
 tRNA-Lys = trnK-UUU
@@ -485,8 +487,10 @@ trnL (CAA) = trnL-CAA
 trnL(CAA) = trnL-CAA
 trnL-CA = trnL-CAA
 trnL-CAA = trnL-CAA
-trnL-CAA; trnL-UAG = trnL-CAA
+# trnL-CAA; trnL-UAG = trnL-CAA # error?
 trnL_CAA = trnL-CAA
+# anti-codon naming convention:
+trnL-UUG = trnL-CAA
 
 # trnL-UAA (tRNA-Leu)
 tRNA-Leu (UAA) = trnL-UAA
@@ -502,13 +506,12 @@ tRNA-Leu (UAG) = trnL-UAG
 trnL (UAG) = trnL-UAG
 trnL(TAG) = trnL-UAG
 trnL(UAG) = trnL-UAG
-trnL-GAG = trnL-UAG
+# trnL-GAG = trnL-UAG # error
 trnL-TAG = trnL-UAG
 trnL-UAG = trnL-UAG
-trnL-UAG; trnL-CAA = trnL-UAG
-trnL-UUG = trnL-UAG
+# trnL-UAG; trnL-CAA = trnL-UAG # error?
 trnL_UAG = trnL-UAG
-trnO-CUA = trnL-UAG
+# trnO-CUA = trnL-UAG # error?
 
 # trnM-CAU (tRNA-Met)
 tRNA-Met (CAU) = trnM-CAU
@@ -516,10 +519,11 @@ trnM = trnM-CAU
 trnM (CAU) = trnM-CAU
 trnM(CAT) = trnM-CAU
 trnM(CAU) = trnM-CAU
-trnM-AUG = trnM-CAU
 trnM-CAT = trnM-CAU
 trnM-CAU = trnM-CAU
 trnM_CAU = trnM-CAU
+# anti-codon naming convention:
+trnM-AUG = trnM-CAU
 
 # trnN-GUU (tRNA-Asn)
 tRNA-Asn (GUU) = trnN-GUU
@@ -528,10 +532,11 @@ trnN (GUU) = trnN-GUU
 trnN(GTT) = trnN-GUU
 trnN(GUU) = trnN-GUU
 trnN(GUU); trnN-GUU = trnN-GUU
-trnN-AAC = trnN-GUU
 trnN-GTT = trnN-GUU
 trnN-GUU = trnN-GUU
 trnN_GUU = trnN-GUU
+# anti-codon naming convention:
+trnN-AAC = trnN-GUU
 
 # trnP-UGG (tRNA-Pro)
 tRNA-Pro (UGG) = trnP-UGG
@@ -539,11 +544,12 @@ trnP = trnP-UGG
 trnP (UGG) = trnP-UGG
 trnP(TGG) = trnP-UGG
 trnP(UGG) = trnP-UGG
-trnP-CCA = trnW-CCA
 trnP-GGG = trnP-UGG
 trnP-TGG = trnP-UGG
 trnP-UGG = trnP-UGG
 trnP_UGG = trnP-UGG
+# anti-codon naming convention:
+trnP-CCA = trnP-UGG
 
 # trnQ-UUG (tRNA-Gln)
 tRNA-Gln (UUG) = trnQ-UUG
@@ -562,8 +568,8 @@ trnR (ACG) = trnR-ACG
 trnR(ACG) = trnR-ACG
 trnR-ACG = trnR-ACG
 trnR-AGC = trnR-ACG
-trnR-CCG = trnR-ACG
-trnR-CGU = trnR-ACG
+# trnR-CCG = trnR-ACG # error?
+# trnR-CGU = trnR-ACG # error?
 trnR_ACG = trnR-ACG
 
 # trnR-UCU (tRNA-Arg)
@@ -583,18 +589,18 @@ trnS(GCT) = trnS-GCU
 trnS(GCU) = trnS-GCU
 trnS-GCT = trnS-GCU
 trnS-GCU = trnS-GCU
-trnS-GGA; trnS-GCU; trnS-UGA = trnS-GGA
-trnS-GGU = trnS-GCU
-trnS-GUC = trnS-GCU
-trnS-UGA; trnS-GCU; trnS-GGA = trnS-UGA
+# trnS-GGA; trnS-GCU; trnS-UGA = trnS-GGA # error?
+# trnS-GGU = trnS-GCU # error?
+# trnS-GUC = trnS-GCU # error?
+# trnS-UGA; trnS-GCU; trnS-GGA = trnS-UGA # error?
 trnS_GCU = trnS-GCU
 
 # trnS-GGA (tRNA-Ser)
 tRNA-Ser (GGA) = trnS-GGA
 trnS (GGA) = trnS-GGA
 trnS(GGA) = trnS-GGA
-trnS-AGA = trnS-GGA
-trnS-CGA = trnS-GGA
+# trnS-AGA = trnS-GGA # error?
+# trnS-CGA = trnS-GGA # error?
 trnS-GGA = trnS-GGA
 trnS_GGA = trnS-GGA
 
@@ -611,24 +617,25 @@ trnS_UGA = trnS-UGA
 tRNA-Thr (GGU) = trnT-GGU
 trnT = trnT-GGU
 trnT (GGU) = trnT-GGU
-trnT(GGT) = trnT-GGU
+# trnT(GGT) = trnT-GGU # error?
 trnT(GGU) = trnT-GGU
-trnT-ACA = trnT-GGU
-trnT-ACC = trnT-GGU
-trnT-CGU = trnT-GGU
+# trnT-ACA = trnT-GGU # error?
+# trnT-CGU = trnT-GGU # error?
 trnT-GGT = trnT-GGU
 trnT-GGU = trnT-GGU
 trnT-GGU; trnT-UGU = trnT-GGU
 trnT_GGU = trnT-GGU
+# anti-codon naming convention:
+trnT-ACC = trnT-GGU
 
 # trnT-UGU (tRNA-Thr)
 tRNA-Thr (UGU) = trnT-UGU
 trnT (UGU) = trnT-UGU
-trnT(TGT) = trnT-UGU
+# trnT(TGT) = trnT-UGU # error?
 trnT(UGU) = trnT-UGU
 trnT-TGT = trnT-UGU
 trnT-UGU = trnT-UGU
-trnT-UGU; trnT(GGU) = trnT-UGU
+# trnT-UGU; trnT(GGU) = trnT-UGU # error?
 trnT_UGU = trnT-UGU
 
 # trnV-GAC (tRNA-Val)
@@ -646,7 +653,7 @@ trnV (UAC) = trnV-UAC
 trnV(UAC) = trnV-UAC
 trnV-TAC = trnV-UAC
 trnV-UAC = trnV-UAC
-trnV-UCA = trnV-UAC
+# trnV-UCA = trnV-UAC # error?
 trnV_UAC = trnV-UAC
 
 # trnW-CCA (tRNA-Trp)
@@ -661,11 +668,11 @@ trnW_CCA = trnW-CCA
 tRNA-Tyr (GUA) = trnY-GUA
 trnY = trnY-GUA
 trnY (GUA) = trnY-GUA
-trnY(GTA) = trnY-GUA
+# trnY(GTA) = trnY-GUA # error?
 trnY(GUA) = trnY-GUA
 trnY-GTA = trnY-GUA
 trnY-GUA = trnY-GUA
-trnY-UAC = trnY-GUA
+# trnY-UAC = trnY-GUA # error?
 trnY_GUA = trnY-GUA
 
 # trnfM-CAU (tRNA-fMet)
@@ -676,7 +683,7 @@ trnfM (CAU) = trnfM-CAU
 trnfM(CAU) = trnfM-CAU
 trnfM-CAT = trnfM-CAU
 trnfM-CAU = trnfM-CAU
-trnfM-CAU; trnP-UGG = trnfM-CAU
+# trnfM-CAU; trnP-UGG = trnfM-CAU # error?
 trnfM_CAU = trnfM-CAU
 
 # ================================================================================

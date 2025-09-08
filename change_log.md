@@ -16,6 +16,11 @@
 - Fixed debug intergenic FASTA file output: when using `--debug_intergenic` with `pav check`, debug FASTA files are now written to the `04_intergenic_analysis` output directory instead of sometimes overwriting input GenBank files. These FASTA files are also now written to `04_intergenic_analysis` when running `pav annotate_and_check`
 - Added Chloë installation verification: PAV now checks if Chloë is properly installed and accessible by running `chloe.jl annotate --help` before starting the annotation pipeline
 - Enhanced error handling: PAV now exits gracefully with an informative message if no annotated genomes are found after Chloë processing, preventing downstream errors
+- Added cleaned/adjusted GenBank file output: PAV now generates cleaned GenBank files, concatentated for multi-sequence samples. These files are produced using the same cleaning logic as EMBL conversion (locus tags, source features, etc.)
+- Added final per-sample files output for Genbank/GFF/FASTA: PAV now generates organised final files in `01_annotated_genomes/01_final_per_sample_files/` directory with per-sample subdirectories containing:
+  - `{sample_name}_final.gbk`: Cleaned/adjusted GenBank files, concatenated for multi-sequence samples
+  - `{sample_name}_final.gff`: Concatenated GFF files (direct output of Chloë for the moment)
+  - `{sample_name}_final.fasta`: Final FASTA files (linearised version if produced, concatenated for multi-sequence samples)
 
 
 ### Version 1.0.0

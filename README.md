@@ -10,7 +10,7 @@
 
 A tool for annotating and validating angiosperm plastid genome annotations, with support for reference-based alignment, quality assessment, and characterisation of intergenic regions. 
 
-Current version: 1.0.1 (August 2025). See the change_log.md [here](https://github.com/chrisjackson-pellicle/PAV/blob/main/change_log.md)
+Current version: 1.0.1 (September 2025). See the change_log.md [here](https://github.com/chrisjackson-pellicle/PAV/blob/main/change_log.md)
 
 ## Overview
 
@@ -450,15 +450,24 @@ output_dir/
 │       ├── all_samples_gene_validation_report.tsv      # Combined gene length/translation checks
 │       └── <sample_name>_gene_validation_report.tsv    # Per-sample reports
 ├── 01_annotated_genomes/
-│   └── sample_name/
-│       ├── <prefix>.round1.chloe.gbk            # Original annotation (preserved)
-│       ├── <prefix>.round1.chloe.gff            # Original GFF (preserved)
-│       ├── <prefix>.round2.chloe.gbk            # Re-annotated after linearisation
-│       ├── <prefix>.round2.chloe.gff            # Re-annotated after linearisation
-│       └── <prefix>.round2.fasta                # Linearised sequence
-│       └── <prefix>_seq001_<seqname>.fasta      # Individual sequences (multi-sequence files only)
-│       └── <prefix>_seq001_<seqname>.round1.chloe.gbk  # Individual sequence annotations
-│       └── <prefix>_seq001_<seqname>.round1.chloe.gff  # Individual sequence GFF files
+│   ├── sample_name/
+│   │   ├── <prefix>.round1.chloe.gbk            # Original annotation (preserved)
+│   │   ├── <prefix>.round1.chloe.gff            # Original GFF (preserved)
+│   │   ├── <prefix>.round2.chloe.gbk            # Re-annotated after linearisation
+│   │   ├── <prefix>.round2.chloe.gff            # Re-annotated after linearisation
+│   │   └── <prefix>.round2.fasta                # Linearised sequence
+│   │   └── <prefix>_seq001_<seqname>.fasta      # Individual sequences (multi-sequence files only)
+│   │   └── <prefix>_seq001_<seqname>.round1.chloe.gbk  # Individual sequence annotations
+│   │   └── <prefix>_seq001_<seqname>.round1.chloe.gff  # Individual sequence GFF files
+│   └── 01_final_per_sample_files/
+│       ├── sample_name/
+│       │   ├── <sample_name>_final.gbk              # Cleaned and concatenated GenBank files
+│       │   ├── <sample_name>_final.gff              # Concatenated GFF files
+│       │   └── <sample_name>_final.fasta            # Final FASTA files (linearised if produced)
+│       └── sample_name2/
+│           ├── <sample_name2>_final.gbk
+│           ├── <sample_name2>_final.gff
+│           └── <sample_name2>_final.fasta
 ├── 02_embl_files/
 │   ├── <sample_name>.embl                        # EMBL format
 │   └── ena_submission_embl_files/
@@ -556,11 +565,19 @@ output_dir/
 - **Sample-only alignments**: Generates alignments using only sample sequences (no external references)
 - **All alignment types run by default** unless disabled with specific `--no_*` flags
 
-#### 4. EMBL and ENA template generation
+#### 4. Final per-sample file generation
+- Creates per-sample subdirectories containing:
+  - Cleaned and concatenated GenBank files (`{sample_name}_final.gbk`)
+  - Concatenated GFF files (`{sample_name}_final.gff`)
+  - Final FASTA files (`{sample_name}_final.fasta`) - uses linearised version if produced
+- Applies locus tags, source features, and other cleaning logic
+- Concatenates all sequences per sample into single files for easier handling
+
+#### 5. EMBL and ENA template generation
 - Adds locus tags and standardizes features for EMBL
 - Builds EMBL templates using metadata TSV (see below), ready for submission to ENA
 
-#### 5. Intergenic region analysis
+#### 6. Intergenic region analysis
 - Extracts intergenic regions from annotated genomes
 - Performs BLAST analysis against a reference database of coding regions, or a custom database
 - Identifies potential functional intergenic regions
@@ -810,7 +827,9 @@ For issues and questions:
 
 ## Misc. links
 
-- ENA EMBL flatfile example: https://ena-docs.readthedocs.io/en/latest/submit/fileprep/flat-file-example.html
+- ENA EMBL flat file example: https://ena-docs.readthedocs.io/en/latest/submit/fileprep/flat-file-example.html
+- NCBI Genbank flat file example: https://www.ncbi.nlm.nih.gov/genbank/samplerecord/
+- INSDC Feature Table Definition: https://www.insdc.org/submitting-standards/feature-table/
 
 ## Changelog
 
@@ -818,7 +837,7 @@ For issues and questions:
 
 - Optional parameters `--chloe_project_dir` and `--chloe_project_name` have been removed. PAV now expects the path to the Chloe project directory as a required positional argument to `pav annotate_and_check`. PAV no longer checks for the Chloe project directory in $CONDA_PREFIX/bin.
 - Added path resolution for the PAV data directory, as setup for a conda package install.   
-
+  
 ### Version 0.0.1 (Initial Release)
 - **Initial release** with plastid genome annotation and validation functions
 - **Genome annotation** with Chloë integration

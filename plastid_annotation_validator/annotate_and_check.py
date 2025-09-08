@@ -41,7 +41,6 @@ import subprocess
 import tempfile
 import glob
 import pandas as pd
-import importlib.resources
 import time
 import re
 
@@ -54,7 +53,7 @@ logger = None
 log_queue = None
 log_listener = None
 
-def load_gene_synonyms(data_dir_base=None):
+def load_gene_synonyms(data_dir_base):
     """
     Load gene synonyms from the package text file for gene name standardization.
     
@@ -63,22 +62,17 @@ def load_gene_synonyms(data_dir_base=None):
     ensure consistent gene naming across different annotation sources.
     
     Args:
-        data_dir_base (str, optional): Base directory containing PAV data files.
-            If None, will raise ValueError.
+        data_dir_base (str): Base directory containing PAV data files.
     
     Returns:
         dict: Dictionary mapping gene names to their standardized synonyms.
             Keys are GenBank-style names, values are standardized names.
     
     Raises:
-        ValueError: If data_dir_base is None
         FileNotFoundError: If gene_synonyms.txt file is not found at the specified path
     
     """
 
-    # Require provided data_dir_base and do not fall back
-    if data_dir_base is None:
-        raise ValueError("data_dir_base must be provided to load_gene_synonyms()")
     candidate_path = os.path.join(data_dir_base, 'gene_synonyms.txt')
     if not os.path.exists(candidate_path):
         raise FileNotFoundError(f"Gene synonyms file not found at: {candidate_path}")
@@ -96,12 +90,12 @@ def load_gene_synonyms(data_dir_base=None):
                 genbank_name, standard_name = line.split(' = ', 1)
                 gene_synonyms[genbank_name.strip()] = standard_name.strip()
 
-    if logger:
-        logger.debug(f"{"[DEBUG]:":10} Successfully loaded {len(gene_synonyms)} gene synonyms from package resources")
+    logger.debug(f"{"[DEBUG]:":10} Successfully loaded {len(gene_synonyms)} gene synonyms from package resources")
+
     return gene_synonyms
         
 
-def load_gene_median_lengths(data_dir_base=None):
+def load_gene_median_lengths(data_dir_base):
     """
     Load gene median lengths from the package CSV file for validation.
     
@@ -110,22 +104,16 @@ def load_gene_median_lengths(data_dir_base=None):
     gene annotations by comparing observed gene lengths against expected ranges.
     
     Args:
-        data_dir_base (str, optional): Base directory containing PAV data files.
-            If None, will raise ValueError.
+        data_dir_base (str): Base directory containing PAV data files.
     
     Returns:
         dict: Dictionary mapping gene names to their median lengths.
             Keys are standardized gene names, values are integer lengths in base pairs.
     
     Raises:
-        ValueError: If data_dir_base is None
         FileNotFoundError: If plDNA_genes_median_lengths.csv file is not found at the specified path
     
     """
-
-    # Require provided data_dir_base and do not fall back
-    if data_dir_base is None:
-        raise ValueError("data_dir_base must be provided to load_gene_median_lengths()")
 
     candidate_path = os.path.join(data_dir_base, 'plDNA_genes_median_lengths.csv')
     if not os.path.exists(candidate_path):
@@ -134,14 +122,12 @@ def load_gene_median_lengths(data_dir_base=None):
     with open(candidate_path, 'r') as csv_file:
         gene_lengths_df = pd.read_csv(csv_file)
 
-    if logger:
-        logger.debug(f"{"[DEBUG]:":10} Successfully loaded reference gene median lengths from package resources")
-        logger.debug(f"{"[DEBUG]:":10} Loaded {len(gene_lengths_df)} gene entries")
+    logger.debug(f"{"[DEBUG]:":10} Successfully loaded reference gene median lengths from package resources")
+    logger.debug(f"{"[DEBUG]:":10} Loaded {len(gene_lengths_df)} gene entries")
     
-    # Convert to dictionary for easier access
+    # Convert to dictionary
     gene_median_lengths = dict(zip(gene_lengths_df['Key'], gene_lengths_df['Value']))
-    if logger:
-        logger.debug(f"{"[DEBUG]:":10} Loaded {len(gene_median_lengths)} gene median lengths")
+    logger.debug(f"{"[DEBUG]:":10} Loaded {len(gene_median_lengths)} gene median lengths")
     
     
     return gene_median_lengths
@@ -1082,7 +1068,7 @@ def write_gene_length_report(all_results, logger, min_threshold, max_threshold, 
         f.write('\n'.join(combined_tsv_lines))
 
 
-def get_references(args, gene_median_lengths, gene_synonyms=None, data_dir_base=None):
+def get_references(args, gene_median_lengths, gene_synonyms, data_dir_base):
     """
     Get reference sequences from appropriate sources for gene validation and alignment.
     
@@ -1104,9 +1090,8 @@ def get_references(args, gene_median_lengths, gene_synonyms=None, data_dir_base=
             - no_per_gene_alignments_with_refs (bool): Whether to disable per-gene alignments with references
             - no_sample_only_alignments (bool): Whether to disable sample-only alignments
         gene_median_lengths (dict): Dictionary mapping gene names to their median lengths
-        gene_synonyms (dict, optional): Dictionary mapping gene names to standardized synonyms
-        data_dir_base (str, optional): Base directory containing PAV data files.
-            If None, will raise ValueError.
+        gene_synonyms (dict): Dictionary mapping gene names to standardized synonyms
+        data_dir_base (str): Base directory containing PAV data files.
     
     Returns:
         dict: Dictionary with gene names as keys and lists of Bio.SeqRecord.SeqRecord
@@ -1114,7 +1099,7 @@ def get_references(args, gene_median_lengths, gene_synonyms=None, data_dir_base=
               that gene from the specified sources.
     
     Raises:
-        ValueError: If data_dir_base is None or if conflicting arguments are provided
+        ValueError: If conflicting arguments are provided
         SystemExit: If required directories or files are not found
 
     Note:
@@ -1129,10 +1114,6 @@ def get_references(args, gene_median_lengths, gene_synonyms=None, data_dir_base=
     default_refs = None
     custom_refs = None
     
-    # Require provided data_dir_base and do not fall back
-    if data_dir_base is None:
-        raise ValueError("data_dir_base must be provided to get_references()")
-
     # Check if refs_order contains entries
     if args.refs_order:
         # If refs_order is specified, no_per_sample_alignments_with_refs and no_per_gene_alignments_with_refs must be False
@@ -2774,7 +2755,7 @@ def align_genes(all_sample_results, ref_gene_seqrecords, output_directory, pool_
     if per_sample_ref_alignments_enabled and per_gene_ref_alignments_enabled and sample_only_enabled:
         completion_message += "Generated all alignment types"
     elif per_sample_ref_alignments_enabled and per_gene_ref_alignments_enabled:
-        completion_message += "Generated reference-based alignments only"
+        completion_message += "Generated reference-based alignments only" 
     elif per_sample_ref_alignments_enabled and sample_only_enabled:
         completion_message += "Generated per-sample reference alignments and sample-only alignments"
     elif per_gene_ref_alignments_enabled and sample_only_enabled:
@@ -2864,14 +2845,13 @@ def split_multi_sequence_fasta(fasta_file, output_dir, filename_prefix, logger=N
         return []
 
 
-def validate_linearisation_genes(linearise_genes, gene_synonyms, logger=None):
+def validate_linearisation_genes(linearise_genes, gene_synonyms):
     """
     Validate that linearisation genes are present in the gene_synonyms.txt file.
     
     Args:
         linearise_genes (list): List of gene names to validate
         gene_synonyms (dict): Dictionary mapping gene names to standardized synonyms
-        logger: Logger instance for logging messages
         
     Returns:
         list: List of validated gene names (RHS values from gene_synonyms.txt)
@@ -2893,8 +2873,7 @@ def validate_linearisation_genes(linearise_genes, gene_synonyms, logger=None):
             if gene in gene_synonyms:
                 mapped_gene = gene_synonyms[gene]
                 validated_genes.append(mapped_gene)
-                if logger:
-                    logger.debug(f"{"[DEBUG]:":10} Mapped linearisation gene: {gene} -> {mapped_gene}")
+                logger.debug(f"{"[DEBUG]:":10} Mapped linearisation gene: {gene} -> {mapped_gene}")
             else:
                 failed_genes.append(gene)
              
@@ -3174,11 +3153,13 @@ def process_single_sequence(fasta_file, output_dir, sequence_name, chloe_project
         return True, {
             'gbk': output_gbk_linearised,
             'gff': output_gff_linearised,
+            'fasta': output_fasta_linearised,
         }, []
     else:
         return True, {
             'gbk': output_gbk_original,
             'gff': output_gff_original,
+            'fasta': fasta_file,
         }, []
 
 
@@ -3301,6 +3282,12 @@ def annotate_genomes(genome_fasta_dir, output_directory, chloe_project_dir, no_f
             logger.warning(f"{"":10} These sequences were not annotated and will not be used in the pipeline")
             
     utils.log_separator(logger) 
+    
+    # Write final per-sample files
+    adjust_and_concat_genbank_files(annotated_genomes, metadata_dict, annotated_genomes_dir)
+    write_concatenated_gff_files(annotated_genomes, annotated_genomes_dir)
+    write_final_fasta_files(annotated_genomes, annotated_genomes_dir)
+
     time.sleep(0.1)
 
     return annotated_genomes
@@ -3393,15 +3380,19 @@ def process_single_fasta_file(fasta_file, annotated_genomes_dir, chloe_project_d
                 # Store all individual sequence files
                 all_gbk_files = []
                 all_gff_files = []
+                all_fasta_files = []
                 
                 for seq_name, seq_result in sample_data['sequences'].items():
                     all_gbk_files.append(seq_result['gbk'])
                     all_gff_files.append(seq_result['gff'])
+                    all_fasta_files.append(seq_result['fasta'])
                 
                 # Store all files in the main dictionary
                 sample_data['gbk'] = all_gbk_files
                 sample_data['gff'] = all_gff_files
-            
+                sample_data['fasta'] = all_fasta_files
+
+
             return True, (filename_prefix_no_dots, sample_data, seqs_with_errors)
         
         else:
@@ -3439,6 +3430,317 @@ def process_single_fasta_file(fasta_file, annotated_genomes_dir, chloe_project_d
         return False, (e, traceback.format_exc())
 
 
+def process_sample_metadata_and_files(sample_name, genome_info, metadata_dict, logger):
+    """
+    Process sample metadata and validate GenBank files.
+    
+    This function handles the common initial processing logic used in both
+    convert_gbk_to_embl and clean_up_genbank_files, including:
+    - Error checking and skipping samples
+    - GenBank file validation and normalization
+    - Metadata lookup and extraction
+    - Default value assignment
+    
+    Args:
+        sample_name (str): Name of the sample being processed
+        genome_info (dict): Dictionary containing genome information
+        metadata_dict (dict): Dictionary mapping input_filename to metadata
+        logger: Logger instance for output
+    
+    Returns:
+        tuple: (gbk_files, locus_tag_prefix, genus_species, sample_metadata, samples_with_metadata)
+               Returns None if sample should be skipped
+    """
+    if 'error' in genome_info:
+        logger.warning(f"{"[WARNING]:":10} Skipping {sample_name} - has error: {genome_info['error']}")
+        return None
+         
+    gbk_files = genome_info.get('gbk')
+    
+    # Handle both single files and lists of files (for multi-sequence samples)
+    if isinstance(gbk_files, list):
+        # Multi-sequence sample
+        if not gbk_files or not all(os.path.exists(f) for f in gbk_files):
+            logger.warning(f"{"[WARNING]:":10} One or more GenBank files not found for {sample_name}")
+            return None
+    else:
+        # Single sequence sample
+        if not gbk_files or not os.path.exists(gbk_files):
+            logger.warning(f"{"[WARNING]:":10} GenBank file not found for {sample_name}")
+            return None
+        # Convert to lists for consistent processing
+        gbk_files = [gbk_files]
+
+    # Get fasta filename for metadata lookup
+    input_filename = genome_info['input_filename']
+    
+    # Get metadata for this sample
+    samples_with_metadata = 0
+    if metadata_dict and input_filename in metadata_dict:
+        sample_metadata = metadata_dict[input_filename]
+        samples_with_metadata = 1
+        logger.debug(f"{"[DEBUG]:":10} Using metadata for {sample_name} (fasta: {input_filename})")
+        
+        # Extract metadata values
+        locus_tag_prefix = sample_metadata['locus_tag']
+        genus_species = sample_metadata['genus_species']
+    else:
+        logger.debug(f"{"[DEBUG]:":10} No metadata found for {sample_name} (fasta: {input_filename})")
+        locus_tag_prefix = 'DEFAULT_TAG'
+        genus_species = 'Unknown species'
+        sample_metadata = None
+    
+    return gbk_files, locus_tag_prefix, genus_species, sample_metadata, samples_with_metadata
+
+
+def clean_genbank_record(record, locus_tag_prefix, genus_species):
+    """
+    Clean a GenBank record by applying standard modifications.
+    
+    This function applies the same cleaning logic used in both convert_gbk_to_embl
+    and clean_up_genbank_files, including:
+    - Adding source feature
+    - Removing and reassigning locus tags
+    - Special rps12 handling
+    - Gene occurrence mapping
+    - Feature qualifier cleanup
+    - CDS feature modifications
+    
+    Args:
+        record (SeqRecord): The GenBank record to clean
+        locus_tag_prefix (str): Prefix for locus tags
+        genus_species (str): Genus and species name for source feature
+    
+    Returns:
+        SeqRecord: The cleaned record (modified in place)
+    """
+    # Update SOURCE field
+    record.annotations['source'] = f"chloroplast {genus_species}"
+    
+    # Add source feature at the beginning of features list
+    source_location = FeatureLocation(0, len(record.seq))
+    source_feature = SeqFeature(
+        location=source_location,
+        type='source',
+        qualifiers={
+            'organism': [genus_species],
+            'mol_type': ['genomic DNA']
+        }
+    )
+    record.features.insert(0, source_feature)
+    
+    # Remove all existing locus_tags
+    for feature in record.features:
+        if 'locus_tag' in feature.qualifiers:
+            del feature.qualifiers['locus_tag']
+    
+    # Initialize locus counter
+    locus_counter = 1
+    
+    # Special handling for rps12
+    try:
+        rps12_cds = []
+        for f in record.features:
+            if f.type == 'CDS' and 'gene' in f.qualifiers and f.qualifiers['gene'][0] == 'rps12':
+                rps12_cds.append(f)
+        
+        if rps12_cds:
+            # Remove all non-CDS rps12 features
+            new_features = []
+            for f in record.features:
+                gene_name = None
+                if 'gene' in f.qualifiers:
+                    gene_name = f.qualifiers['gene'][0]
+                elif 'product' in f.qualifiers:
+                    gene_name = f.qualifiers['product'][0]
+                if gene_name == 'rps12' and f.type != 'CDS':
+                    continue
+                new_features.append(f)
+            
+            # Insert a gene feature immediately before each rps12 CDS
+            for cds in rps12_cds:
+                try:
+                    insert_at = new_features.index(cds)
+                except ValueError:
+                    insert_at = len(new_features)
+                rps12_gene_feature = SeqFeature(
+                    location=cds.location,
+                    type='gene',
+                    qualifiers={'gene': ['rps12']}
+                )
+                # Assign a shared locus_tag for the CDS and its paired gene feature
+                pair_tag = f"{locus_tag_prefix}_LOCUS{locus_counter}"
+                locus_counter += 1
+                rps12_gene_feature.qualifiers['locus_tag'] = [pair_tag]
+                cds.qualifiers['locus_tag'] = [pair_tag]
+                new_features.insert(insert_at, rps12_gene_feature)
+            
+            record.features = new_features
+    except Exception:
+        # Fail-safe: proceed without special handling if any unexpected structure is encountered
+        pass
+    
+    # First pass: identify gene groups and assign locus_tags in order
+    gene_occurrence_map = {}  # gene_name -> occurrence_count
+    gene_group_locus_map = {}  # (gene_name, occurrence) -> locus_tag
+    feature_to_gene_group = {}  # feature_index -> (gene_name, occurrence)
+    
+    for idx, feature in enumerate(record.features):
+        if feature.type in ['gene', 'CDS', 'tRNA', 'rRNA', 'intron']:
+            # Skip if already has a locus_tag (e.g., from rps12 special handling)
+            if 'locus_tag' in feature.qualifiers:
+                continue
+            
+            # Get gene name
+            gene_name = None
+            if 'gene' in feature.qualifiers:
+                gene_name = feature.qualifiers['gene'][0]
+            
+            if gene_name:
+                # Determine which occurrence of this gene we're dealing with
+                if feature.type == 'gene':
+                    # New gene occurrence
+                    gene_occurrence_map[gene_name] = gene_occurrence_map.get(gene_name, 0) + 1
+                    current_occurrence = gene_occurrence_map[gene_name]
+                    
+                    # Assign new locus tag for this gene occurrence
+                    gene_group = (gene_name, current_occurrence)
+                    gene_group_locus_map[gene_group] = f"{locus_tag_prefix}_LOCUS{locus_counter}"
+                    locus_counter += 1
+                else:
+                    # Feature belongs to the most recent occurrence of this gene
+                    current_occurrence = gene_occurrence_map.get(gene_name, 1)
+                    gene_group = (gene_name, current_occurrence)
+                    
+                    # Create locus tag if this is the first feature for a gene without a gene feature
+                    if gene_group not in gene_group_locus_map:
+                        gene_occurrence_map[gene_name] = current_occurrence
+                        gene_group_locus_map[gene_group] = f"{locus_tag_prefix}_LOCUS{locus_counter}"
+                        locus_counter += 1
+                    
+                feature_to_gene_group[idx] = gene_group
+        
+        elif feature.type == 'repeat_region':
+            feature.qualifiers['locus_tag'] = [f"{locus_tag_prefix}_LOCUS{locus_counter}"]
+            locus_counter += 1
+    
+    # Second pass: apply locus tags and other modifications
+    for idx, feature in enumerate(record.features):
+        # Remove /ID= and /parent= and /name qualifiers if present
+        if 'ID' in feature.qualifiers:
+            del feature.qualifiers['ID']
+        if 'parent' in feature.qualifiers:
+            del feature.qualifiers['parent']
+        if 'name' in feature.qualifiers:
+            del feature.qualifiers['name']
+        
+        if feature.type in ['gene', 'CDS', 'tRNA', 'rRNA', 'intron']:
+            # Skip if already has a locus_tag (e.g., from rps12 special handling)
+            if 'locus_tag' not in feature.qualifiers:
+                if idx in feature_to_gene_group:
+                    gene_group = feature_to_gene_group[idx]
+                    if gene_group in gene_group_locus_map:
+                        feature.qualifiers['locus_tag'] = [gene_group_locus_map[gene_group]]
+        
+        # Additional modifications for CDS features
+        if feature.type == 'CDS':
+            # Add /transl_table=11 to all CDS features
+            feature.qualifiers['transl_table'] = ['11']
+            
+            # Add /codon_start=1 to all CDS features
+            feature.qualifiers['codon_start'] = ['1']
+            
+            # Add /trans_splicing to rps12 genes
+            if 'gene' in feature.qualifiers and feature.qualifiers['gene'][0] == 'rps12':
+                feature.qualifiers['trans_splicing'] = ['']
+    
+    return record
+
+
+def adjust_and_concat_genbank_files(annotated_genomes_dict, metadata_dict, output_directory):
+    """
+    Clean up GenBank files and concatenate them per sample.
+    
+    This function processes sequences from annotated_genomes_dict, applies the same
+    cleaning logic as convert_gbk_to_embl (locus tags, source features, etc.), and
+    concatenates all cleaned GenBank files for each sample into a single file.
+    
+    Args:
+        annotated_genomes_dict (dict): Dictionary of annotated genome information
+        metadata_dict (dict, optional): Dictionary mapping input_filename to metadata
+        output_directory (str): Output directory for cleaned GenBank files
+    
+    Returns:
+        None
+    """
+
+    logger.info(f"{"[INFO]:":10} Adjusting GenBank files, and concatenating for multi-sequence samples...")
+    
+    # Create final per-sample files directory
+    final_files_dir = os.path.join(output_directory, '01_final_per_sample_files')
+    os.makedirs(final_files_dir, exist_ok=True)
+    
+    # Track metadata usage
+    total_samples_with_metadata = 0
+    
+    for sample_name, genome_info in annotated_genomes_dict.items():
+        # Use shared initial processing logic
+        result = process_sample_metadata_and_files(sample_name, genome_info, metadata_dict, logger)
+        if result is None:
+            continue  # Sample was skipped
+        
+        gbk_files, locus_tag_prefix, genus_species, sample_metadata, samples_with_metadata = result
+        total_samples_with_metadata += samples_with_metadata
+        
+        # Process each file in the list and collect cleaned records for concatenation
+        cleaned_records = []    
+        
+        for file_idx, gbk_file in enumerate(gbk_files):
+
+            # Read GenBank file
+            records = utils.parse_genbank_file(gbk_file, logger)
+            record = records[0]
+            
+            # Apply shared cleaning logic
+            clean_genbank_record(record, locus_tag_prefix, genus_species)
+          
+            # For multi-sequence samples, create sequence-specific names
+            if len(gbk_files) > 1:
+                seq_suffix = f"_seq{file_idx+1:03d}"
+                record.id = f"{sample_name}_{record.id}{seq_suffix}"
+                record.name = f"{sample_name}_{record.name}{seq_suffix}"
+                record.description = f"{genus_species} chloroplast"
+            else:
+                # For single sequence samples, ensure DEFINITION is set correctly
+                record.description = f"{genus_species} chloroplast"
+            
+            cleaned_records.append(record)
+            logger.debug(f"{"[DEBUG]:":10} Cleaned GenBank record for {sample_name} file {file_idx+1}")
+                
+        # Create per-sample directory
+        sample_dir = os.path.join(final_files_dir, sample_name)
+        os.makedirs(sample_dir, exist_ok=True)
+        
+        # Write concatenated cleaned GenBank file for this sample
+        if cleaned_records:
+            cleaned_gbk_filename = f"{sample_name}_final.gbk"
+            cleaned_gbk_filepath = os.path.join(sample_dir, cleaned_gbk_filename)
+    
+            utils.write_genbank_file(cleaned_records, cleaned_gbk_filepath, suppress_warnings=True)
+            
+            logger.debug(f"{"[DEBUG]:":10} Wrote final GenBank file: {cleaned_gbk_filepath}")
+                
+        else:
+            logger.warning(f"{"[WARNING]:":10} No cleaned records to write for {sample_name}")
+    
+    logger.info(f"{"[INFO]:":10} GenBank file adjustment and concatenation complete. Files written to: {final_files_dir}")
+    
+    # Log metadata usage summary
+    logger.debug(f"{"[DEBUG]:":10} Used metadata for {total_samples_with_metadata} out of {len(annotated_genomes_dict)} samples")
+    
+    utils.log_separator(logger)
+
+
 def convert_gbk_to_embl(annotated_genomes_dict, output_directory, metadata_dict=None):
     """
     Convert GenBank files to EMBL format with sample-specific metadata.
@@ -3467,47 +3769,16 @@ def convert_gbk_to_embl(annotated_genomes_dict, output_directory, metadata_dict=
     os.makedirs(ena_submission_dir, exist_ok=True)
     
     # Track metadata usage
-    samples_with_metadata = 0
+    total_samples_with_metadata = 0
     
     for sample_name, genome_info in annotated_genomes_dict.items():
-
-        if 'error' in genome_info:
-            logger.warning(f"{"[WARNING]:":10} Skipping {sample_name} - has error: {genome_info['error']}")
-            continue
-            
-        gbk_files = genome_info.get('gbk')
+        # Use shared initial processing logic
+        result = process_sample_metadata_and_files(sample_name, genome_info, metadata_dict, logger)
+        if result is None:
+            continue  # Sample was skipped
         
-        # Handle both single files and lists of files (for multi-sequence samples)
-        if isinstance(gbk_files, list):
-            # Multi-sequence sample
-            if not gbk_files or not all(os.path.exists(f) for f in gbk_files):
-                logger.warning(f"{"[WARNING]:":10} One or more GenBank files not found for {sample_name}")
-                continue
-        else:
-            # Single sequence sample
-            if not gbk_files or not os.path.exists(gbk_files):
-                logger.warning(f"{"[WARNING]:":10} GenBank file not found for {sample_name}")
-                continue
-            # Convert to lists for consistent processing
-            gbk_files = [gbk_files]
-        
-        # Get fasta filename for metadata lookup
-        input_filename = genome_info['input_filename']
-        
-        # Get metadata for this sample (all samples must be in metadata by this point if running main() for subcommand `annotate_and_check`)
-        if metadata_dict and input_filename in metadata_dict:
-            sample_metadata = metadata_dict[input_filename]
-            samples_with_metadata += 1
-            logger.debug(f"{"[DEBUG]:":10} Using metadata for {sample_name} (fasta: {input_filename})")
- 
-            # Extract some metadata values here
-            locus_tag_prefix = sample_metadata['locus_tag']
-            genus_species = sample_metadata['genus_species']
-        else:
-            logger.debug(f"{"[DEBUG]:":10} No metadata found for {sample_name} (fasta: {input_filename})")
-            locus_tag_prefix = 'DEFAULT_TAG'
-            genus_species = 'Unknown species'
-            sample_metadata = None
+        gbk_files, locus_tag_prefix, genus_species, sample_metadata, samples_with_metadata = result
+        total_samples_with_metadata += samples_with_metadata
             
         # Process each file in the lists and collect ENA EMBL files for concatenation
         ena_embl_files = []
@@ -3526,155 +3797,15 @@ def convert_gbk_to_embl(annotated_genomes_dict, output_directory, metadata_dict=
                 record = records[0]
                 record_seq_length = len(record.seq)
 
-                # Add source feature at the beginning of features list
-                source_location = FeatureLocation(0, len(record.seq))
-                source_feature = SeqFeature(
-                    location=source_location,
-                    type='source',
-                    qualifiers={
-                        'organism': [genus_species],
-                        'mol_type': ['genomic DNA']
-                    }
-                )
-                record.features.insert(0, source_feature)
-
-                # Remove all existing locus_tags
-                for feature in record.features:
-                    if 'locus_tag' in feature.qualifiers:
-                        del feature.qualifiers['locus_tag']
-                
-                # Initialize locus counter before any special-case tagging
-                locus_counter = 1
-
-                # Special handling for rps12:
-                # - Keep the two rps12 CDS features
-                # - Create a corresponding gene feature for each CDS with identical coordinates
-                # - Remove all other rps12 features (e.g., gene or intron features that don't match the CDS)
-                try:
-                    rps12_cds = []
-                    for f in record.features:
-                        if f.type == 'CDS' and 'gene' in f.qualifiers and f.qualifiers['gene'][0] == 'rps12':
-                            rps12_cds.append(f)
-
-                    if rps12_cds:
-                        # Remove all non-CDS rps12 features
-                        new_features = []
-                        for f in record.features:
-                            gene_name = None
-                            if 'gene' in f.qualifiers:
-                                gene_name = f.qualifiers['gene'][0]
-                            elif 'product' in f.qualifiers:
-                                gene_name = f.qualifiers['product'][0]
-                            if gene_name == 'rps12' and f.type != 'CDS':
-                                continue
-                            new_features.append(f)
-
-                        # Insert a gene feature immediately before each rps12 CDS
-                        for cds in rps12_cds:
-                            try:
-                                insert_at = new_features.index(cds)
-                            except ValueError:
-                                insert_at = len(new_features)
-                            rps12_gene_feature = SeqFeature(
-                                location=cds.location,
-                                type='gene',
-                                qualifiers={'gene': ['rps12']}
-                            )
-                            # Assign a shared locus_tag for the CDS and its paired gene feature
-                            pair_tag = f"{locus_tag_prefix}_LOCUS{locus_counter}"
-                            locus_counter += 1
-                            rps12_gene_feature.qualifiers['locus_tag'] = [pair_tag]
-                            cds.qualifiers['locus_tag'] = [pair_tag]
-                            new_features.insert(insert_at, rps12_gene_feature)
-
-                        record.features = new_features
-                except Exception:
-                    # Fail-safe: proceed without special handling if any unexpected structure is encountered
-                    pass
-
-                # Modify features for EMBL output
-                
-                # First pass: identify gene groups and assign locus_tags in order
-                gene_occurrence_map = {}  # gene_name -> occurrence_count
-                gene_group_locus_map = {}  # (gene_name, occurrence) -> locus_tag
-                feature_to_gene_group = {}  # feature_index -> (gene_name, occurrence)
-                
-                for idx, feature in enumerate(record.features):
-                    if feature.type in ['gene', 'CDS', 'tRNA', 'rRNA', 'intron']:
-                        # Skip if already has a locus_tag (e.g., from rps12 special handling)
-                        if 'locus_tag' in feature.qualifiers:
-                            continue
-
-                        # Get gene name
-                        gene_name = None
-                        if 'gene' in feature.qualifiers:
-                            gene_name = feature.qualifiers['gene'][0]
-      
-                        if gene_name:
-                            # Determine which occurrence of this gene we're dealing with
-                            if feature.type == 'gene':
-                                # New gene occurrence
-                                gene_occurrence_map[gene_name] = gene_occurrence_map.get(gene_name, 0) + 1
-                                current_occurrence = gene_occurrence_map[gene_name]
-                                
-                                # Assign new locus tag for this gene occurrence
-                                gene_group = (gene_name, current_occurrence)
-                                gene_group_locus_map[gene_group] = f"{locus_tag_prefix}_LOCUS{locus_counter}"
-                                locus_counter += 1
-                            else:
-                                # Feature belongs to the most recent occurrence of this gene
-                                current_occurrence = gene_occurrence_map.get(gene_name, 1)
-                                gene_group = (gene_name, current_occurrence)
-                                
-                                # Create locus tag if this is the first feature for a gene without a gene feature
-                                if gene_group not in gene_group_locus_map:
-                                    gene_occurrence_map[gene_name] = current_occurrence
-                                    gene_group_locus_map[gene_group] = f"{locus_tag_prefix}_LOCUS{locus_counter}"
-                                    locus_counter += 1
-                            
-                            feature_to_gene_group[idx] = gene_group
-                        
-                    elif feature.type == 'repeat_region':
-                        feature.qualifiers['locus_tag'] = [f"{locus_tag_prefix}_LOCUS{locus_counter}"]
-                        locus_counter += 1
-
-                # Second pass: apply locus tags and other modifications
-                for idx, feature in enumerate(record.features):
-                    # Remove /ID= and /parent= and /name qualifiers if present (not used in EMBL format)
-                    if 'ID' in feature.qualifiers:
-                        del feature.qualifiers['ID']
-                    if 'parent' in feature.qualifiers:
-                        del feature.qualifiers['parent']
-                    if 'name' in feature.qualifiers:
-                        del feature.qualifiers['name']
-                    
-                    if feature.type in ['gene', 'CDS', 'tRNA', 'rRNA', 'intron']:
-                        # Skip if already has a locus_tag (e.g., from rps12 special handling)
-                        if 'locus_tag' not in feature.qualifiers:
-                            if idx in feature_to_gene_group:
-                                gene_group = feature_to_gene_group[idx]
-                                if gene_group in gene_group_locus_map:
-                                    feature.qualifiers['locus_tag'] = [gene_group_locus_map[gene_group]]
-                    
-                    # Additional modifications for CDS features
-                    if feature.type == 'CDS':
-                        # Add /transl_table=11 to all CDS features
-                        feature.qualifiers['transl_table'] = ['11']
-
-                        # Add /codon_start=1 to all CDS features
-                        feature.qualifiers['codon_start'] = ['1']
-                        
-                        # Add /trans_splicing to rps12 genes
-                        if 'gene' in feature.qualifiers and feature.qualifiers['gene'][0] == 'rps12':
-                            feature.qualifiers['trans_splicing'] = ['']
+                # Apply shared cleaning logic
+                clean_genbank_record(record, locus_tag_prefix, genus_species)
                 
                 # Convert to EMBL format
                 embl_filename = f"{embl_sample_name}.embl"
                 embl_filepath = os.path.join(embl_output_dir, embl_filename)
                 
                 # Write EMBL file first pass
-                with open(embl_filepath, 'w') as handle:
-                    SeqIO.write(record, handle, 'embl')
+                utils.write_embl_file(record, embl_filepath, suppress_warnings=True)
 
                 # Convert EMBL file to ENA template format
                 ena_embl_filepath = convert_embl_to_ena_template(embl_filepath, sample_metadata, record_seq_length, record.id, ena_submission_dir)
@@ -3727,7 +3858,7 @@ def convert_gbk_to_embl(annotated_genomes_dict, output_directory, metadata_dict=
     logger.info(f"{"[INFO]:":10} EMBL conversion complete. Files written to: {embl_output_dir}")
     
     # Log metadata usage summary
-    logger.debug(f"{"[DEBUG]:":10} Successfully processed {samples_with_metadata} samples with metadata")
+    logger.debug(f"{"[DEBUG]:":10} Successfully processed {total_samples_with_metadata} samples with metadata")
     
     utils.log_separator(logger)
 
@@ -3891,14 +4022,15 @@ def detect_blast_database(directory_path, logger=None):
     return db_path
 
 
-def query_intergenic_regions(annotated_genomes_dict, output_directory, min_intergenic_length=50, blast_evalue=1e-10, 
-                             debug_intergenic=False, max_blast_hits=1, pool_size=1, threads=1, log_queue=None, custom_blast_db=None, data_dir_base=None):
+def query_intergenic_regions(annotated_genomes_dict, output_directory, data_dir_base, min_intergenic_length=50, blast_evalue=1e-10, 
+                             debug_intergenic=False, max_blast_hits=1, pool_size=1, threads=1, log_queue=None, custom_blast_db=None):
     """
     Query intergenic regions from annotated genomes.
     
     Args:
         annotated_genomes_dict (dict): Dictionary of annotated genome information
         output_directory (str): Output directory for results
+        data_dir_base (str): Base data directory for PAV resources.
         min_intergenic_length (int): Minimum length of intergenic region to analyze
         blast_evalue (float): BLAST E-value threshold
         debug_intergenic (bool): Whether to write debug FASTA files
@@ -3907,8 +4039,7 @@ def query_intergenic_regions(annotated_genomes_dict, output_directory, min_inter
         threads (int): Number of threads to use for each process
         log_queue (queue.Queue, optional): Multiprocessing-safe queue for logging
         custom_blast_db (str, optional): Custom BLAST database path. If None, uses default order_genomes_blastdb
-        data_dir_base (str, optional): Base data directory for PAV resources. 
-    
+         
     Returns:
         None
     """
@@ -4947,13 +5078,13 @@ def check_pipeline(args):
         data_dir_base = utils.resolve_data_dir_base()
 
         # Load gene median lengths from resolved data directory
-        gene_median_lengths = load_gene_median_lengths(data_dir_base=data_dir_base)
+        gene_median_lengths = load_gene_median_lengths(data_dir_base)
 
         # Load gene synonyms from resolved data directory
-        gene_synonyms = load_gene_synonyms(data_dir_base=data_dir_base)
+        gene_synonyms = load_gene_synonyms(data_dir_base)
 
         # Get reference sequences
-        ref_gene_seqrecords = get_references(args, gene_median_lengths, gene_synonyms, data_dir_base=data_dir_base)
+        ref_gene_seqrecords = get_references(args, gene_median_lengths, gene_synonyms, data_dir_base)
 
         # Parse required metadata TSV file
         if args.metadata_tsv:
@@ -5002,7 +5133,7 @@ def check_pipeline(args):
         if not args.skip_intergenic_analysis:
             query_intergenic_regions(annotated_genomes_dict, args.output_directory, args.min_intergenic_length,
                                      args.blast_evalue, args.debug_intergenic, args.max_blast_hits, args.pool,
-                                     args.threads, log_queue, args.custom_blast_db, data_dir_base=data_dir_base)
+                                     args.threads, log_queue, args.custom_blast_db)
         else:
             logger.info(f"{"[INFO]:":10} Skipping intergenic region analysis as requested")
  
@@ -5031,6 +5162,102 @@ def check_pipeline(args):
 
         utils.log_manager.cleanup()
 
+
+
+def write_final_fasta_files(annotated_genomes_dict, output_directory):
+    """
+    Write final FASTA files (linearised version if present, concatenated for multi-sequence samples).
+    
+    Args:
+        annotated_genomes_dict (dict): Dictionary of annotated genome information
+        output_directory (str): Output directory for FASTA files
+    """
+    logger.info(f"{"[INFO]:":10} Writing final FASTA files...")
+    
+    # Create final per-sample files directory
+    final_files_dir = os.path.join(output_directory, '01_final_per_sample_files')
+    os.makedirs(final_files_dir, exist_ok=True)
+    
+    for sample_name, genome_info in annotated_genomes_dict.items():
+        if 'error' in genome_info:
+            continue
+            
+        # Create per-sample directory
+        sample_dir = os.path.join(final_files_dir, sample_name)
+        os.makedirs(sample_dir, exist_ok=True)
+        
+        # Get FASTA files
+        fasta_files = []
+        if 'fasta' in genome_info and genome_info['fasta']:
+            fasta_files = genome_info['fasta']
+            if not isinstance(fasta_files, list):
+                fasta_files = [fasta_files]
+        
+        if not fasta_files:
+            continue
+        
+        # Write concatenated FASTA file
+        final_fasta_filename = f"{sample_name}_final.fasta"
+        final_fasta_filepath = os.path.join(sample_dir, final_fasta_filename)
+        
+        with open(final_fasta_filepath, 'w') as outfile:
+            for fasta_file in fasta_files:
+                if os.path.exists(fasta_file):
+                    with open(fasta_file, 'r') as infile:
+                        outfile.write(infile.read())
+        
+        logger.debug(f"{"[DEBUG]:":10} Wrote final FASTA file: {final_fasta_filepath}")
+    
+    logger.info(f"{"[INFO]:":10} Final FASTA file writing complete. Files written to: {final_files_dir}")
+
+    utils.log_separator(logger)
+
+
+def write_concatenated_gff_files(annotated_genomes_dict, output_directory):
+    """
+    Write concatenated GFF files for each sample.
+    
+    Args:
+        annotated_genomes_dict (dict): Dictionary of annotated genome information
+        output_directory (str): Output directory for GFF files
+    """
+    logger.info(f"{"[INFO]:":10} Writing concatenated GFF files...")
+    
+    # Create final per-sample files directory
+    final_files_dir = os.path.join(output_directory, '01_final_per_sample_files')
+    os.makedirs(final_files_dir, exist_ok=True)
+    
+    for sample_name, genome_info in annotated_genomes_dict.items():
+        if 'error' in genome_info:
+            continue
+            
+        gff_files = genome_info.get('gff', [])
+        if not gff_files:
+            continue
+            
+        # Handle both single files and lists
+        if not isinstance(gff_files, list):
+            gff_files = [gff_files]
+        
+        # Create per-sample directory
+        sample_dir = os.path.join(final_files_dir, sample_name)
+        os.makedirs(sample_dir, exist_ok=True)
+        
+        # Write concatenated GFF file
+        concatenated_gff_filename = f"{sample_name}_final.gff"
+        concatenated_gff_filepath = os.path.join(sample_dir, concatenated_gff_filename)
+        
+        with open(concatenated_gff_filepath, 'w') as outfile:
+            for gff_file in gff_files:
+                if os.path.exists(gff_file):
+                    with open(gff_file, 'r') as infile:
+                        outfile.write(infile.read())
+        
+        logger.debug(f"{"[DEBUG]:":10} Wrote concatenated GFF file: {concatenated_gff_filepath}")
+    
+    logger.info(f"{"[INFO]:":10} GFF file concatenation complete. Files written to: {final_files_dir}")
+
+    utils.log_separator(logger)
 
 
 def main(args):
@@ -5112,19 +5339,19 @@ def main(args):
         data_dir_base = utils.resolve_data_dir_base()
 
         # Load gene median lengths from resolved data directory
-        gene_median_lengths = load_gene_median_lengths(data_dir_base=data_dir_base)
+        gene_median_lengths = load_gene_median_lengths(data_dir_base)
 
         # Load gene synonyms from resolved data directory
-        gene_synonyms = load_gene_synonyms(data_dir_base=data_dir_base)
+        gene_synonyms = load_gene_synonyms(data_dir_base)
 
         # Get reference sequences
-        ref_gene_seqrecords = get_references(args, gene_median_lengths, gene_synonyms, data_dir_base=data_dir_base)
+        ref_gene_seqrecords = get_references(args, gene_median_lengths, gene_synonyms, data_dir_base)
 
         # Parse required metadata TSV file
         metadata_dict = parse_metadata_tsv(args.metadata_tsv, args.genome_fasta_dir)
 
         # Validate linearisation genes against gene_synonyms.txt
-        validated_linearise_genes = validate_linearisation_genes(args.linearise_gene, gene_synonyms, logger)
+        validated_linearise_genes = validate_linearisation_genes(args.linearise_gene, gene_synonyms)
 
         # Annotate the genomes using chloë (project dir required)
         annotated_genomes_dict = annotate_genomes(
@@ -5141,14 +5368,14 @@ def main(args):
         if not annotated_genomes_dict:
             logger.warning(f"{"[WARNING]:":10} No annotated genomes found, exiting.")
             utils.exit_program()
-        
+
+        # Convert assembly gbk files to embl format
+        convert_gbk_to_embl(annotated_genomes_dict, args.output_directory, metadata_dict=metadata_dict)
+
         # Check genes and write reports
         all_sample_results = check_genes(gene_median_lengths, annotated_genomes_dict, args.min_length_percentage,
                                          args.max_length_percentage, args.report_directory, log_queue, args.pool,
                                          gene_synonyms)
-
-        # Convert assembly gbk files to embl format
-        convert_gbk_to_embl(annotated_genomes_dict, args.output_directory, metadata_dict=metadata_dict)
 
         # Generate alignments if not disabled
         align_genes(all_sample_results, ref_gene_seqrecords, args.output_directory, args.pool, args.threads,
@@ -5156,9 +5383,9 @@ def main(args):
 
         # Query intergenic regions
         if not args.skip_intergenic_analysis:
-            query_intergenic_regions(annotated_genomes_dict, args.output_directory, args.min_intergenic_length,
+            query_intergenic_regions(annotated_genomes_dict, args.output_directory, data_dir_base, args.min_intergenic_length,
                                      args.blast_evalue, args.debug_intergenic, args.max_blast_hits, args.pool,
-                                     args.threads, log_queue, args.custom_blast_db, data_dir_base=data_dir_base)
+                                     args.threads, log_queue, args.custom_blast_db)
         else:
             logger.info(f"{"[INFO]:":10} Skipping intergenic region analysis as requested")
  

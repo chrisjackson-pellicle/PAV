@@ -15,6 +15,7 @@ import threading
 from multiprocessing import Manager
 import time
 import gzip
+import warnings
 
 
 class LogManager:
@@ -678,7 +679,6 @@ def parse_genbank_file(gbk_file_path, logger=None):
         ValueError: If the GenBank file is empty or contains no valid records
         Exception: For other parsing errors
     """
-    import warnings
     
     # Check if file exists
     if not os.path.exists(gbk_file_path):
@@ -759,4 +759,41 @@ def resolve_data_dir_base():
     conda_prefix = os.environ.get('CONDA_PREFIX')
     conda_data_dir = os.path.join(conda_prefix, 'share', 'PAV', 'data') if conda_prefix else None
     pkg_data_dir = os.path.join(os.path.dirname(__file__), 'data')
-    return conda_data_dir if (conda_data_dir and os.path.exists(conda_data_dir)) else pkg_data_dir 
+    return conda_data_dir if (conda_data_dir and os.path.exists(conda_data_dir)) else pkg_data_dir
+
+
+def write_genbank_file(records, file_path, suppress_warnings=False):
+    """
+    Write a list of Bio.SeqRecord.SeqRecord objects to a GenBank file.
+    
+    Args:
+        records (list): List of Bio.SeqRecord.SeqRecord objects to write
+        file_path (str): Path to the output GenBank file
+        suppress_warnings (bool): Whether to suppress warnings when writing the file
+    """
+    if suppress_warnings:
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", UserWarning)
+            warnings.filterwarnings("ignore", message=".*Increasing length of locus line to allow long name.*")
+            warnings.filterwarnings("ignore", message=".*too long for.*")
+            
+            with open(file_path, 'w') as handle:
+                SeqIO.write(records, handle, 'genbank')
+
+
+def write_embl_file(records, file_path, suppress_warnings=False):
+    """
+    Write a list of Bio.SeqRecord.SeqRecord objects to an EMBL file.
+    
+    Args:
+        records (list): List of Bio.SeqRecord.SeqRecord objects to write
+        file_path (str): Path to the output EMBL file
+        suppress_warnings (bool): Whether to suppress warnings when writing the file
+    """
+    if suppress_warnings:
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", UserWarning)
+            warnings.filterwarnings("ignore", message=".*too long.*")
+
+            with open(file_path, 'w') as handle:
+                SeqIO.write(records, handle, 'embl')
