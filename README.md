@@ -43,7 +43,18 @@ You can install PAV with **most** dependencies using conda:
 > [!IMPORTANT]
 > You will still need to install Julia and Chloë separately, see steps 3 and 4 below.
 >
-> This is because I can't get Chloë to instantiate with a conda installation of Julia during conda package build (yet) - Julia core dump, possible SSL issue, etc.  
+> This is because I can't get Chloë to instantiate with a conda installation of Julia during conda package build (yet) - Julia core dump, possible SSL issue, etc.
+
+> [!IMPORTANT]
+> There is currently an issue with Chloë (version 0.1.18, commit 1d7b710) where any `N` characters in your input FASTA sequences are converted to `A` characters, and these can appear in gene annotations (see [here](https://github.com/ian-small/Chloe.jl/issues/24)). 
+> If you would like to retain the original `N` characters, you can install Chloe from a fork [here](https://github.com/chrisjackson-pellicle/chloe), using the branch `N-to-A-fix`, e.g.:
+> ```
+> git clone https://github.com/chrisjackson-pellicle/chloe.git
+> cd chloe
+> git checkout N-to-A-fix
+> ```
+> ...then proceed with the normal Chloë installation procedure.
+
 
 Alternatively, you can install everything manually, as below.
 
